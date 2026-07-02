@@ -1,0 +1,74 @@
+{
+  "completed": false,
+  "currentPhase": 7,
+  "currentTask": "7.1",
+  "notes": "Phases 1-6 done pre-loop (commit 6da51e8). Gate per plan: each phase's 'done when' criteria. Model: Fable 5 until 6AM, Opus 4.8 after (user switches via /model).",
+  "phases": {
+    "7": {
+      "title": "Categories page + all settings managers",
+      "doneWhen": "budget edits persist (browser-verified)",
+      "tasks": [
+        { "id": "7.1", "desc": "Server data layer: queries/{categories,settings}.ts + actions/{categories,settings}.ts", "status": "in_progress" },
+        { "id": "7.2", "desc": "Categories UI: components/categories/* + (app)/categories/page.tsx", "status": "pending" },
+        { "id": "7.3", "desc": "Settings UI: components/settings/* + (app)/settings/page.tsx", "status": "pending" },
+        { "id": "7.4", "desc": "Browser verify: budget edit persists + manager CRUD walk; close phase", "status": "pending" }
+      ]
+    },
+    "8": {
+      "title": "Migration: legacy-import + seed CLI; freeze schema",
+      "doneWhen": "reconciliation all-match on real data (V2)",
+      "tasks": [
+        { "id": "8.1", "desc": "lib/legacy-import.ts: LegacyBundle validate -> normalize -> uuid graph -> db.batch -> reconciliation", "status": "pending" },
+        { "id": "8.2", "desc": "scripts/seed-legacy.ts + npm run seed:legacy", "status": "pending" },
+        { "id": "8.3", "desc": "Drive MCP export Sheet -> data/legacy/*.json (format-detect v4 vs Ledger)", "status": "pending" },
+        { "id": "8.4", "desc": "Run seed:legacy --force; V2 reconciliation exact-match", "status": "pending" },
+        { "id": "8.5", "desc": "Freeze schema: drizzle-kit generate, commit migrations", "status": "pending" }
+      ]
+    },
+    "9": {
+      "title": "Dashboard widgets on real data",
+      "doneWhen": "current-month totals match the Sheet",
+      "tasks": [
+        { "id": "9.1", "desc": "queries/wealth.ts + dashboard queries (Promise.all)", "status": "pending" },
+        { "id": "9.2", "desc": "hero-numbers, month-pulse, budget-frameworks, sinking-funds, recent-activity, empty-state", "status": "pending" },
+        { "id": "9.3", "desc": "wealth-card, holdings-table, refresh-prices-button, account-cards, balance-editor", "status": "pending" },
+        { "id": "9.4", "desc": "Verify current-month totals vs Sheet; close phase", "status": "pending" }
+      ]
+    },
+    "10": {
+      "title": "Analytics charts",
+      "doneWhen": "numbers cross-checked vs legacy for a known month",
+      "tasks": [
+        { "id": "10.1", "desc": "analytics queries (month-scoped aggregates)", "status": "pending" },
+        { "id": "10.2", "desc": "month-picker, cashflow-chart, category-breakdown, framework-donut, networth-area, savings-trend", "status": "pending" },
+        { "id": "10.3", "desc": "Cross-check a known month vs legacy; close phase", "status": "pending" }
+      ]
+    },
+    "11": {
+      "title": "Import wizard + make:template + start-fresh",
+      "doneWhen": "template round-trips on a 2nd account (V9)",
+      "tasks": [
+        { "id": "11.1", "desc": "make:template script (legacy sheet/column names)", "status": "pending" },
+        { "id": "11.2", "desc": "wizard: upload -> mapping -> preview -> commit (shares lib/legacy-import core)", "status": "pending" },
+        { "id": "11.3", "desc": "start-fresh path + V9 verify; close phase", "status": "pending" }
+      ]
+    },
+    "12": {
+      "title": "Solar theme + motion polish",
+      "doneWhen": "V5/V6 pass",
+      "tasks": [
+        { "id": "12.1", "desc": "use-solar-theme resolution ladder + fortuna-theme-mode key", "status": "pending" },
+        { "id": "12.2", "desc": "Motion polish pass through motion/reveal.tsx choke point", "status": "pending" },
+        { "id": "12.3", "desc": "V5 reduced-motion + V6 solar boundary verify; close phase", "status": "pending" }
+      ]
+    },
+    "13": {
+      "title": "Final sweep + a11y + closure",
+      "doneWhen": "V1-V10 green",
+      "tasks": [
+        { "id": "13.1", "desc": "Run V1-V10 sweep; fix regressions", "status": "pending" },
+        { "id": "13.2", "desc": "Closure report to workspace; set completed:true; terminate loop", "status": "pending" }
+      ]
+    }
+  }
+}
