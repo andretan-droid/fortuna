@@ -1,0 +1,366 @@
+import { sql } from "drizzle-orm";
+import {
+  pgTable,
+  pgEnum,
+  text,
+  integer,
+  bigint,
+  numeric,
+  boolean,
+  timestamp,
+  date,
+  uuid,
+  primaryKey,
+  unique,
+  uniqueIndex,
+  index,
+  check,
+} from "drizzle-orm/pg-core";
+import type { AdapterAccount } from "next-auth/adapters";
+
+/* ============================================================================
+   Fortuna schema — single source of truth (frozen → drizzle migrations in P8).
+
+   Conventions (from legacy Code.gs, preserved for zero-loss migration):
+   · Money = integer cents in bigint `*_cents`; amounts positive + CHECK ≥ 0,
+     `type` carries direction. Balances may be negative (no CHECK).
+   · Shares / prices / FX = numeric (never float).
+   · Months = text 'YYYY-MM' + regex CHECK; dates = date 'YYYY-MM-DD'.
+   · Domain PKs = uuid generated APP-SIDE (crypto.randomUUID) — neon-http
+     db.batch() can't read generated ids back mid-batch.
+   · Every domain row is scoped by user_id → users.id ON DELETE CASCADE.
+     Intra-domain FKs are RESTRICT — ledger history never cascades away.
+   ========================================================================== */
+
+const uuidPk = () =>
+  uuid("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID());
+
+/** Timestamp helper — UTC, defaults to now(). */
+const nowTs = (name: string) =>
+  timestamp(name, { withTimezone: true }).notNull().defaultNow();
+
+// ---- Enums (verbatim legacy casing) ---------------------------------------
+export const txnType = pgEnum("txn_type", [
+  "Income",
+  "Expense",
+  "Deduction",
+  "Transfer",
+]);
+export const framework = pgEnum("framework", [
+  "Needs",
+  "Wants",
+  "Savings",
+  "Income",
+  "Deduction",
+  "Transfer",
+]);
+export const accountKind = pgEnum("account_kind", ["Asset", "Liability"]);
+
+/* ============================================================================
+   Auth.js tables (adapter-standard). Collision fix: the OAuth link table is
+   `oauth_accounts` so the financial entity keeps the clean name `accounts`.
+   ========================================================================== */
+
+export const users = pgTable("users", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  name: text("name"),
+  email: text("email").notNull(),
+  emailVerified: timestamp("email_verified", { mode: "date" }),
+  image: text("image"),
+});
+
+export const oauthAccounts = pgTable(
+  "oauth_accounts",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    type: text("type").$type<AdapterAccount["type"]>().notNull(),
+    provider: text("provider").notNull(),
+    providerAccountId: text("provider_account_id").notNull(),
+    refresh_token: text("refresh_token"),
+    access_token: text("access_token"),
+    expires_at: integer("expires_at"),
+    token_type: text("token_type"),
+    scope: text("scope"),
+    id_token: text("id_token"),
+    session_state: text("session_state"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.provider, t.providerAccountId] }),
+  ],
+);
+
+export const sessions = pgTable("sessions", {
+  sessionToken: text("session_token").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  expires: timestamp("expires", { mode: "date" }).notNull(),
+});
+
+export const verificationTokens = pgTable(
+  "verification_tokens",
+  {
+    identifier: text("identifier").notNull(),
+    token: text("token").notNull(),
+    expires: timestamp("expires", { mode: "date" }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.identifier, t.token] })],
+);
+
+/* ============================================================================
+   Domain tables
+   ========================================================================== */
+
+export const categories = pgTable(
+  "categories",
+  {
+    id: uuidPk(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(), // = legacy Subcategory
+    mainCategory: text("main_category"),
+    type: txnType("type").notNull(),
+    framework: framework("framework").notNull(),
+    monthlyBudgetCents: bigint("monthly_budget_cents", { mode: "number" })
+      .notNull()
+      .default(0),
+    active: boolean("active").notNull().default(true),
+  },
+  (t) => [
+    unique("categories_user_name_uq").on(t.userId, t.name),
+    check("categories_budget_nonneg", sql`${t.monthlyBudgetCents} >= 0`),
+  ],
+);
+
+export const paymentMethods = pgTable(
+  "payment_methods",
+  {
+    id: uuidPk(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    active: boolean("active").notNull().default(true),
+  },
+  (t) => [unique("payment_methods_user_name_uq").on(t.userId, t.name)],
+);
+
+export const accounts = pgTable(
+  "accounts",
+  {
+    id: uuidPk(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    kind: accountKind("kind").notNull(),
+    sort: integer("sort").notNull().default(0),
+    active: boolean("active").notNull().default(true),
+  },
+  (t) => [unique("accounts_user_name_uq").on(t.userId, t.name)],
+);
+
+export const bnplPlans = pgTable("bnpl_plans", {
+  id: uuidPk(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  legacyId: text("legacy_id"),
+  item: text("item").notNull(),
+  platform: text("platform"),
+  categoryId: uuid("category_id")
+    .notNull()
+    .references(() => categories.id, { onDelete: "restrict" }),
+  totalAmountCents: bigint("total_amount_cents", { mode: "number" }).notNull(),
+  nInstalments: integer("n_instalments").notNull(),
+  instalmentCents: bigint("instalment_cents", { mode: "number" }).notNull(),
+  firstDueMonth: text("first_due_month"),
+  status: text("status").notNull().default("auto"),
+  notes: text("notes"),
+});
+
+export const transactions = pgTable(
+  "transactions",
+  {
+    id: uuidPk(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    legacyId: text("legacy_id"),
+    date: date("date").notNull(), // 'YYYY-MM-DD' (string mode)
+    amountCents: bigint("amount_cents", { mode: "number" }).notNull(),
+    description: text("description"),
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => categories.id, { onDelete: "restrict" }),
+    paymentMethodId: uuid("payment_method_id").references(
+      () => paymentMethods.id,
+      { onDelete: "restrict" },
+    ),
+    type: txnType("type").notNull(),
+    bnplPlanId: uuid("bnpl_plan_id").references(() => bnplPlans.id, {
+      onDelete: "restrict",
+    }),
+    deleted: boolean("deleted").notNull().default(false),
+    createdAt: nowTs("created_at"),
+    updatedAt: nowTs("updated_at"),
+  },
+  (t) => [
+    // Keyset-pagination feed order (see server/queries + GET route).
+    index("idx_txn_feed").on(
+      t.userId,
+      t.date.desc(),
+      t.createdAt.desc(),
+      t.id.desc(),
+    ),
+    index("idx_txn_category").on(t.userId, t.categoryId),
+    uniqueIndex("txn_user_legacy_uq")
+      .on(t.userId, t.legacyId)
+      .where(sql`${t.legacyId} is not null`),
+    check("transactions_amount_nonneg", sql`${t.amountCents} >= 0`),
+  ],
+);
+
+export const holdings = pgTable(
+  "holdings",
+  {
+    id: uuidPk(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    ticker: text("ticker").notNull(),
+    name: text("name"),
+    exchange: text("exchange"),
+    shares: numeric("shares", { precision: 24, scale: 8 }),
+    avgCostLocal: numeric("avg_cost_local", { precision: 24, scale: 6 }),
+    ccy: text("ccy"),
+    priceLive: numeric("price_live", { precision: 24, scale: 6 }),
+    dayChgPct: numeric("day_chg_pct", { precision: 12, scale: 4 }),
+    manualPriceOverride: numeric("manual_price_override", {
+      precision: 24,
+      scale: 6,
+    }),
+    priceUpdatedAt: timestamp("price_updated_at", { withTimezone: true }),
+  },
+  (t) => [unique("holdings_user_ticker_uq").on(t.userId, t.ticker)],
+);
+
+export const fxRates = pgTable(
+  "fx_rates",
+  {
+    id: uuidPk(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    pair: text("pair").notNull(),
+    rateLive: numeric("rate_live", { precision: 24, scale: 8 }),
+    fallback: numeric("fallback", { precision: 24, scale: 8 }),
+  },
+  (t) => [unique("fx_rates_user_pair_uq").on(t.userId, t.pair)],
+);
+
+export const snapshots = pgTable(
+  "snapshots",
+  {
+    id: uuidPk(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    month: text("month").notNull(),
+    portfolioValueCents: bigint("portfolio_value_cents", { mode: "number" }),
+    usdMyrAtSnap: numeric("usd_myr_at_snap", { precision: 24, scale: 8 }),
+    notes: text("notes"),
+  },
+  (t) => [
+    unique("snapshots_user_month_uq").on(t.userId, t.month),
+    check("snapshots_month_fmt", sql`${t.month} ~ '^\\d{4}-\\d{2}$'`),
+  ],
+);
+
+export const netWorthEntries = pgTable(
+  "net_worth_entries",
+  {
+    id: uuidPk(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    month: text("month").notNull(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "restrict" }),
+    balanceCents: bigint("balance_cents", { mode: "number" }).notNull(),
+  },
+  (t) => [
+    unique("nwe_user_account_month_uq").on(t.userId, t.accountId, t.month),
+    index("idx_nwe_user_month").on(t.userId, t.month),
+    check("nwe_month_fmt", sql`${t.month} ~ '^\\d{4}-\\d{2}$'`),
+  ],
+);
+
+export const sinkingFunds = pgTable("sinking_funds", {
+  id: uuidPk(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  annualTargetCents: bigint("annual_target_cents", { mode: "number" }),
+  monthlyAccrualCents: bigint("monthly_accrual_cents", { mode: "number" }),
+  matchCategoryId: uuid("match_category_id").references(() => categories.id, {
+    onDelete: "restrict",
+  }),
+  openingBalanceCents: bigint("opening_balance_cents", { mode: "number" })
+    .notNull()
+    .default(0),
+  active: boolean("active").notNull().default(true),
+});
+
+export const recurringRules = pgTable(
+  "recurring_rules",
+  {
+    id: uuidPk(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    description: text("description").notNull(),
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => categories.id, { onDelete: "restrict" }),
+    expectedCents: bigint("expected_cents", { mode: "number" }),
+    paymentMethodId: uuid("payment_method_id").references(
+      () => paymentMethods.id,
+      { onDelete: "restrict" },
+    ),
+    day: integer("day"),
+    tolerance: numeric("tolerance", { precision: 6, scale: 4 }),
+    active: boolean("active").notNull().default(true),
+  },
+  (t) => [check("recurring_day_range", sql`${t.day} between 1 and 31`)],
+);
+
+export const userSettings = pgTable("user_settings", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  currency: text("currency").notNull().default("RM"),
+  grossSalaryCents: bigint("gross_salary_cents", { mode: "number" }),
+  statutoryCents: bigint("statutory_cents", { mode: "number" }),
+  netSalaryCents: bigint("net_salary_cents", { mode: "number" }),
+  fxUsdFallback: numeric("fx_usd_fallback", { precision: 24, scale: 8 }),
+  targetSavingsRate: numeric("target_savings_rate", { precision: 6, scale: 4 }),
+  // SET NULL (not RESTRICT): deleting a payment method just clears the default.
+  defaultPaymentMethodId: uuid("default_payment_method_id").references(
+    () => paymentMethods.id,
+    { onDelete: "set null" },
+  ),
+  priceFeedUrl: text("price_feed_url"),
+  priceFeedToken: text("price_feed_token"),
+  pricesUpdatedAt: timestamp("prices_updated_at", { withTimezone: true }),
+  updatedAt: nowTs("updated_at"),
+});
