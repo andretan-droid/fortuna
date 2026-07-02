@@ -1,0 +1,241 @@
+@import "tailwindcss";
+
+/* next-themes drives `.dark` on <html>; make the `dark:` variant follow that
+   class rather than the OS `prefers-color-scheme` default. */
+@custom-variant dark (&:is(.dark *));
+
+/* ============================================================================
+   FORTUNA  —  Ivory ↔ Obsidian
+   Light  "Ivory"    = Aesop warm paper   (#FFFEF2 cream · #0A0A14 blue-black)
+   Dark   "Obsidian" = Clay deep space    (#050411 base · #F5F5F7 · #5D50BF)
+   Palette mined 2026-07-02 via Firecrawl → inspiration-tokens/tokens.css.
+   Confidence: colors [confirmed]; brand/finance semantics [designed on top].
+   ============================================================================ */
+
+:root {
+  --radius: 0.625rem; /* 10px — Rimowa card radius; crisp, not bubbly */
+
+  /* ---- Ivory: warm paper (Aesop) ---- */
+  --background: #fffef2;            /* aesop-bg: cream, never pure white */
+  --foreground: #0a0a14;           /* aesop-text: blue-black, never pure black */
+  --card: #ffffff;                 /* aesop-surface: paper lifts off cream */
+  --card-foreground: #0a0a14;
+  --popover: #ffffff;
+  --popover-foreground: #0a0a14;
+  --primary: #0a0a14;              /* ink-on-paper CTA */
+  --primary-foreground: #fffef2;
+  --secondary: #f6f5e8;            /* aesop-bg-alt */
+  --secondary-foreground: #0a0a14;
+  --muted: #f6f5e8;
+  --muted-foreground: #646470;     /* aesop-text-muted (AA on cream) */
+  --accent: #f0efe0;               /* subtle warm hover surface */
+  --accent-foreground: #0a0a14;
+  --destructive: #a1341f;          /* terracotta — paper-friendly red */
+  --destructive-foreground: #fffef2;
+  --border: rgba(10, 10, 20, 0.12);   /* hairline rule */
+  --input: rgba(10, 10, 20, 0.16);
+  --ring: #5d50bf;                 /* indigo focus ring */
+
+  /* ---- Brand + finance semantics ---- */
+  --brand: #5d50bf;               /* clay indigo — AA on cream */
+  --brand-foreground: #fffef2;
+  --income: #3f6f4e;              /* deep fern — positive amounts */
+  --warning: #9a6b1e;             /* amber — staleness / over-budget */
+
+  /* ---- Atmosphere ---- */
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(10, 10, 20, 0.08);
+  --shadow-paper: 0 0 10px rgba(0, 0, 0, 0.05), 0 2px 8px rgba(0, 0, 0, 0.06);
+  --grain-opacity: 0.035;
+
+  /* ---- Charts (refined in Phase 10 with dataviz skill) ---- */
+  --chart-1: #5d50bf;
+  --chart-2: #3f6f4e;
+  --chart-3: #9a6b1e;
+  --chart-4: #7c6f9f;
+  --chart-5: #a1341f;
+
+  /* ---- Sidebar (shadcn) ---- */
+  --sidebar: #fffef2;
+  --sidebar-foreground: #0a0a14;
+  --sidebar-primary: #0a0a14;
+  --sidebar-primary-foreground: #fffef2;
+  --sidebar-accent: #f0efe0;
+  --sidebar-accent-foreground: #0a0a14;
+  --sidebar-border: rgba(10, 10, 20, 0.10);
+  --sidebar-ring: #5d50bf;
+}
+
+.dark {
+  /* ---- Obsidian: deep space (Clay Marqeta + Discover) ---- */
+  --background: #050411;            /* clay-marqeta-base */
+  --foreground: #f5f5f7;           /* clay-text-light */
+  --card: #0c0a22;                 /* lifted indigo-tinted layer */
+  --card-foreground: #f5f5f7;
+  --popover: #0c0a22;
+  --popover-foreground: #f5f5f7;
+  --primary: #f5f5f7;             /* near-white CTA on deep space */
+  --primary-foreground: #050411;
+  --secondary: #14112e;
+  --secondary-foreground: #f5f5f7;
+  --muted: #14112e;
+  --muted-foreground: #a5a2c0;    /* lightened muted (AA on base) */
+  --accent: #1b1740;
+  --accent-foreground: #f5f5f7;
+  --destructive: #e06a56;
+  --destructive-foreground: #050411;
+  --border: rgba(245, 245, 247, 0.10);
+  --input: rgba(245, 245, 247, 0.14);
+  --ring: #8b80f0;
+
+  --brand: #8b80f0;               /* lightened indigo — AA text on deep space */
+  --brand-foreground: #050411;
+  --income: #6fd39a;              /* mint — positive on deep space */
+  --warning: #e0b062;
+
+  --glass-bg: rgba(12, 10, 34, 0.55);
+  --glass-border: rgba(245, 245, 247, 0.09);
+  --shadow-paper: 0 8px 40px rgba(0, 0, 0, 0.6);
+  --grain-opacity: 0.05;
+
+  --chart-1: #8b80f0;
+  --chart-2: #6fd39a;
+  --chart-3: #e0b062;
+  --chart-4: #b9a8ff;
+  --chart-5: #e06a56;
+
+  --sidebar: #09001a;             /* discover-base-deep — deepest layer */
+  --sidebar-foreground: #f5f5f7;
+  --sidebar-primary: #8b80f0;
+  --sidebar-primary-foreground: #050411;
+  --sidebar-accent: #1b1740;
+  --sidebar-accent-foreground: #f5f5f7;
+  --sidebar-border: rgba(245, 245, 247, 0.08);
+  --sidebar-ring: #8b80f0;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-income: var(--income);
+  --color-warning: var(--warning);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Fonts wired by next/font in layout.tsx; fallbacks keep SSR legible. */
+  --font-sans: var(--font-hanken), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: var(--font-fraunces), Georgia, "Times New Roman", serif;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* Motion curves (Clay reveal + Apple hover) — mirrored in lib/motion.ts */
+  --ease-reveal: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-hover: cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* signature: gentle cross-fade on the solar/theme flip */
+    transition: background-color 0.5s var(--ease-hover), color 0.5s var(--ease-hover);
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--brand) 26%, transparent);
+    color: var(--foreground);
+  }
+  /* Editorial serif display, tight-tracked in the Clay manner. */
+  .font-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+}
+
+/* ---- Utilities ---------------------------------------------------------- */
+
+/* The ONE tabular-numeral isolation point (plan V7). If Hanken's tnum fails
+   the width test, only this rule swaps to a mono numeral face. */
+@utility tabular {
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+}
+
+/* Frosted glass — Obsidian shell/cards; degrades to opaque where unsupported. */
+@utility glass {
+  background-color: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+}
+
+/* Fixed grain overlay — subtle tooth over the whole viewport. pointer-events
+   none so it never blocks interaction; opacity is theme-scaled. */
+.grain-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+  opacity: var(--grain-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Hover/press micro-interactions — only when motion is welcome (plan). */
+@media (prefers-reduced-motion: no-preference) {
+  .interactive {
+    transition: transform 0.24s var(--ease-hover), box-shadow 0.24s var(--ease-hover),
+      background-color 0.24s var(--ease-hover), border-color 0.24s var(--ease-hover);
+    will-change: transform;
+  }
+  .interactive:hover {
+    transform: translateY(-2px);
+  }
+  .interactive:active {
+    transform: translateY(0);
+  }
+}
