@@ -11,7 +11,7 @@
         { "id": "7.1", "desc": "Server data layer: queries/{categories,settings}.ts + actions/{categories,settings}.ts", "status": "completed", "commit": "b476296" },
         { "id": "7.2", "desc": "Categories UI: components/categories/* + (app)/categories/page.tsx", "status": "completed", "commit": "c88513a" },
         { "id": "7.3", "desc": "Settings UI: components/settings/* + (app)/settings/page.tsx", "status": "completed", "commit": "97647ae" },
-        { "id": "7.4", "desc": "Browser verify: budget edit persists + manager CRUD walk; close phase", "status": "completed", "commit": "pending" }
+        { "id": "7.4", "desc": "Browser verify: budget edit persists + manager CRUD walk; close phase", "status": "completed", "commit": "6e7cd56" }
       ]
     },
     "8": {
