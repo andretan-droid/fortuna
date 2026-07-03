@@ -1,7 +1,7 @@
 {
   "completed": false,
-  "currentPhase": 11,
-  "currentTask": "11.3",
+  "currentPhase": 12,
+  "currentTask": "12.1",
   "notes": "Phases 1-6 done pre-loop (commit 6da51e8). Gate per plan: each phase's 'done when' criteria. Model: Fable 5 until 6AM, Opus 4.8 after (user switches via /model).",
   "phases": {
     "7": {
@@ -50,7 +50,7 @@
       "tasks": [
         { "id": "11.1", "desc": "make:template script (legacy sheet/column names)", "status": "completed", "commit": "6468e3b" },
         { "id": "11.2", "desc": "wizard: upload -> mapping -> preview -> commit (shares lib/legacy-import core)", "status": "completed", "commit": "6729e2a" },
-        { "id": "11.3", "desc": "start-fresh path + V9 verify; close phase", "status": "pending" }
+        { "id": "11.3", "desc": "start-fresh path (existing EmptyState) + V9 verify via scripts/verify-import-e2e.ts (real Neon commit path for a fresh user, reconciliation all-match, self-cleaning). Literal 2nd-Google-account OAuth click remains for Andre.", "status": "completed", "commit": "30e1ab4" }
       ]
     },
     "12": {
