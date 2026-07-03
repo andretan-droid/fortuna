@@ -1,7 +1,7 @@
 {
   "completed": false,
   "currentPhase": 11,
-  "currentTask": "11.2",
+  "currentTask": "11.3",
   "notes": "Phases 1-6 done pre-loop (commit 6da51e8). Gate per plan: each phase's 'done when' criteria. Model: Fable 5 until 6AM, Opus 4.8 after (user switches via /model).",
   "phases": {
     "7": {
@@ -49,7 +49,7 @@
       "doneWhen": "template round-trips on a 2nd account (V9)",
       "tasks": [
         { "id": "11.1", "desc": "make:template script (legacy sheet/column names)", "status": "completed", "commit": "6468e3b" },
-        { "id": "11.2", "desc": "wizard: upload -> mapping -> preview -> commit (shares lib/legacy-import core)", "status": "pending" },
+        { "id": "11.2", "desc": "wizard: upload -> mapping -> preview -> commit (shares lib/legacy-import core)", "status": "completed", "commit": "6729e2a" },
         { "id": "11.3", "desc": "start-fresh path + V9 verify; close phase", "status": "pending" }
       ]
     },
