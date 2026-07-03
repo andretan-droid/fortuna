@@ -1,7 +1,7 @@
 {
   "completed": false,
-  "currentPhase": 10,
-  "currentTask": "10.3",
+  "currentPhase": 11,
+  "currentTask": "11.1",
   "notes": "Phases 1-6 done pre-loop (commit 6da51e8). Gate per plan: each phase's 'done when' criteria. Model: Fable 5 until 6AM, Opus 4.8 after (user switches via /model).",
   "phases": {
     "7": {
@@ -41,7 +41,7 @@
       "tasks": [
         { "id": "10.1", "desc": "analytics queries (month-scoped aggregates)", "status": "completed", "commit": "8b9090b" },
         { "id": "10.2", "desc": "month-picker, cashflow-chart, category-breakdown, framework-donut, networth-area, savings-trend", "status": "completed", "commit": "eee86d5" },
-        { "id": "10.3", "desc": "Cross-check a known month vs legacy; close phase", "status": "pending" }
+        { "id": "10.3", "desc": "Cross-check a known month vs legacy (tool: scripts/verify-analytics.ts; June 2026 clean); close phase", "status": "completed", "commit": "06bf577" }
       ]
     },
     "11": {
