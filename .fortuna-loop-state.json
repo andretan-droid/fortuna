@@ -1,7 +1,7 @@
 {
   "completed": false,
   "currentPhase": 8,
-  "currentTask": "8.3",
+  "currentTask": "8.4",
   "notes": "Phases 1-6 done pre-loop (commit 6da51e8). Gate per plan: each phase's 'done when' criteria. Model: Fable 5 until 6AM, Opus 4.8 after (user switches via /model).",
   "phases": {
     "7": {
@@ -20,7 +20,7 @@
       "tasks": [
         { "id": "8.1", "desc": "lib/legacy-import.ts: LegacyBundle validate -> normalize -> uuid graph -> db.batch -> reconciliation", "status": "completed", "commit": "ad4ae20" },
         { "id": "8.2", "desc": "scripts/seed-legacy.ts + npm run seed:legacy", "status": "completed", "commit": "1baf756" },
-        { "id": "8.3", "desc": "Drive MCP export Sheet -> data/legacy/*.json (format-detect v4 vs Ledger)", "status": "pending" },
+        { "id": "8.3", "desc": "Drive MCP export Sheet -> data/legacy/*.json (source: v5 schema_version 5 export; portfolio captured)", "status": "completed", "commit": "07b134b" },
         { "id": "8.4", "desc": "Run seed:legacy --force; V2 reconciliation exact-match", "status": "pending" },
         { "id": "8.5", "desc": "Freeze schema: drizzle-kit generate, commit migrations", "status": "pending" }
       ]
