@@ -1,7 +1,7 @@
 {
   "completed": false,
   "currentPhase": 9,
-  "currentTask": "9.1",
+  "currentTask": "9.2",
   "notes": "Phases 1-6 done pre-loop (commit 6da51e8). Gate per plan: each phase's 'done when' criteria. Model: Fable 5 until 6AM, Opus 4.8 after (user switches via /model).",
   "phases": {
     "7": {
@@ -29,7 +29,7 @@
       "title": "Dashboard widgets on real data",
       "doneWhen": "current-month totals match the Sheet",
       "tasks": [
-        { "id": "9.1", "desc": "queries/wealth.ts + dashboard queries (Promise.all)", "status": "pending" },
+        { "id": "9.1", "desc": "queries/wealth.ts + dashboard queries (Promise.all)", "status": "completed", "commit": "0162253" },
         { "id": "9.2", "desc": "hero-numbers, month-pulse, budget-frameworks, sinking-funds, recent-activity, empty-state", "status": "pending" },
         { "id": "9.3", "desc": "wealth-card, holdings-table, refresh-prices-button, account-cards, balance-editor", "status": "pending" },
         { "id": "9.4", "desc": "Verify current-month totals vs Sheet; close phase", "status": "pending" }
