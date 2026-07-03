@@ -41,16 +41,17 @@ commit `b36f8b5`). Two defects found and fixed mid-sweep.
 | V7 | Tabular-numeral width test | ✅ **browser** | `.tabular` = `tabular-nums`; `111,111.11` / `999,999.99` / `000,000.00` all render **79.375px — 0px jitter** |
 | V8 | Keyboard focus + a11y + contrast | ✅ **browser** | 0 label/name violations after fix (account-type select got `aria-label`); focus ring present on tab-walk; contrast 8.31:1 (nav) to 15.51:1 (h1); chart palette CVD/contrast validated via dataviz `validate_palette.js`. _Literal Lighthouse numeric score not run — the audit tool launches an unauthenticated browser; its constituent a11y checks were run directly against the signed-in pages instead._ |
 | V9 | Import round-trip on a 2nd account | ✅ core+DB | `verify-import-e2e.ts` runs the real commit path for a fresh user. Literal 2nd-Google-OAuth sign-in still owner-only (auth, orthogonal to import) |
-| V10 | Price refresh vs real Apps Script endpoint | ⏳ **owner-only** | needs the live endpoint + token — un-runnable without Andre's credentials |
+| V10 | Price refresh vs real Apps Script endpoint | ✅ **browser** | Rewired to the real v5 contract (`?action=bootstrap&token=…`, token as query param). Verified end to end against the live sheet: 46 holdings priced, FX updated, portfolio **RM 96,721.18 → RM 96,733.01**, card shows "as of 3 Jul, 03:49 pm". Caveat: first *cold* refresh can time out on GOOGLEFINANCE recalc — action fails safe (no partial write, error toast), click again |
 
 ## Manual steps remaining (owner)
 
 1. ~~Browser V-sweep (V3/V4/V7/V8)~~ — **DONE 2026-07-03** (commit `b36f8b5`). See matrix above.
 2. ~~V6 solar~~ — **DONE** (resolved in-browser, no errors). Optional extra: fake-clock across a boundary + block `sunrise-sunset.org` to eyeball the 07/19 fallback; logic already unit-verified.
 3. **V9 literal** — add a 2nd Google account as an OAuth test user, sign in, upload `public/templates/fortuna-import.xlsx` via `/import`, confirm the data lands. _(Import commit path already proven headlessly; this only exercises OAuth.)_
-4. **V10** — configure the price-feed URL/token in Settings, hit "Refresh prices" against the real Apps Script endpoint; confirm override precedence and the bad-token toast. **Blocks `completed: true`** — needs your live endpoint.
+4. ~~V10 price refresh~~ — **DONE 2026-07-03** (commit `0505099`), verified against your live sheet. **Security follow-up: regenerate the API token** (🧰 Budget Tracker → ♻️ Regenerate token, then re-save it in Settings → Price feed) — the token was shared in chat during setup, so rotate it.
 5. **Data caveat (from 9.4)** — net-worth liabilities show 0 because the P8 import captured only asset balance entries (confirmed live: Net Worth reads RM 202,645.63 with liabilities=0). Backfill via the dashboard Balance Editor or re-import with liability rows.
 6. **Deploy** — out of scope (pairs with the pending `npx vercel login`).
+7. **(Optional) V9 literal** — sign in with a 2nd Google account and upload the template; the import commit path is already proven, this only exercises OAuth. Not a gate.
 
 ## How to run the headless checks
 

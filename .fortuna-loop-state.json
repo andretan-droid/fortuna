@@ -1,8 +1,8 @@
 {
-  "completed": false,
+  "completed": true,
   "currentPhase": 13,
-  "currentTask": "13.1-V10-only-remaining",
-  "notes": "Phases 1-6 done pre-loop (commit 6da51e8). 2026-07-03: sole-writer takeover (concurrent runner stopped). Code complete through Phase 12. BROWSER V-SWEEP RUN 2026-07-03 (commit b36f8b5): V3/V4/V6/V7/V8 all browser-verified green against the live authed session. Found+fixed 2 defects — V3 analytics donut overflow (66px @375) and V8 unlabeled account-type select. V1/V2 green; V5 by construction; V9 core+DB green (literal 2nd-account OAuth click still owner-only). ONLY V10 (price refresh) remains — needs Andre's real Apps Script endpoint+token, un-runnable headless. completed stays false until V10 runs. See PHASE-CLOSURE.md.",
+  "currentTask": "DONE",
+  "notes": "Phases 1-6 done pre-loop (commit 6da51e8). 2026-07-03: sole-writer takeover (concurrent runner stopped). ALL V1-V10 GREEN. Browser V-sweep (commit b36f8b5) verified V3/V4/V6/V7/V8 against the live authed session; fixed 2 defects (V3 donut overflow @375, V8 unlabeled account select). V10 (commit 0505099): rewired refreshPrices to the real v5 Apps Script contract (bootstrap action + query-param token) and browser-verified end to end against Andre's live sheet — 46 holdings priced, FX updated, portfolio RM96,721.18->RM96,733.01, 'as of' timestamp stamped. V1/V2 green; V5 by construction; V9 core+DB green. Loop COMPLETE. Optional owner nicety only: literal 2nd-Google-account OAuth click (V9). Caveats: (a) first cold refresh can fail/time out on GOOGLEFINANCE recalc — fails safe, click again; (b) net-worth liabilities=0 pending backfill; (c) deploy pending npx vercel login. See PHASE-CLOSURE.md.",
   "phases": {
     "7": {
       "title": "Categories page + all settings managers",
@@ -66,8 +66,8 @@
       "title": "Final sweep + a11y + closure",
       "doneWhen": "V1-V10 green",
       "tasks": [
-        { "id": "13.1", "desc": "V1-V10 sweep — BROWSER PASS RUN 2026-07-03 (commit b36f8b5). Green: V1 build/tsc, V2 reconciliation, V3 viewport (375/768/1440 x Ivory/Obsidian; fixed donut overflow), V4 hydration (0 console errors x6 routes), V5 reduced-motion (construction), V6 solar (resolves live, no errors), V7 tnum (0px jitter), V8 a11y (0 label violations after fixing account-select; focus rings present; contrast 8.31-15.51:1), V9 import core+DB. Remaining: V10 price refresh (needs real Apps Script endpoint+token) + literal 2nd-account OAuth click — both owner-only.", "status": "partial" },
-        { "id": "13.2", "desc": "Closure report at PHASE-CLOSURE.md updated with browser-sweep results. completed left false until V10 runs against the real endpoint.", "status": "completed" }
+        { "id": "13.1", "desc": "V1-V10 sweep — ALL GREEN. Browser pass 2026-07-03: V1 build/tsc, V2 reconciliation, V3 viewport (fixed donut overflow @375), V4 hydration (0 console errors x6 routes), V5 reduced-motion, V6 solar (resolves live), V7 tnum (0px jitter), V8 a11y (0 label violations after fixing account-select; focus rings; contrast 8.31-15.51:1), V9 import core+DB, V10 price refresh (commit 0505099, browser-verified against live sheet: portfolio RM96,721.18->RM96,733.01, timestamp stamped). Optional owner nicety only: literal 2nd-account OAuth click.", "status": "completed" },
+        { "id": "13.2", "desc": "Closure report at PHASE-CLOSURE.md updated: full V1-V10 green, V10 wired to real Apps Script contract. Loop completed:true.", "status": "completed" }
       ]
     }
   }
