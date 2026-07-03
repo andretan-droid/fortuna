@@ -1,8 +1,8 @@
 {
   "completed": false,
   "currentPhase": 13,
-  "currentTask": "13.1-browser-DEFERRED",
-  "notes": "Phases 1-6 done pre-loop (commit 6da51e8). 2026-07-03: sole-writer takeover (concurrent runner stopped). Code complete through Phase 12. Owner chose 'headless verify + defer browser' — headless V1/V2 green, V5/V6/V9 verified by construction+self-check; browser V3/V4/V7/V8/V10 + literal 2nd-account OAuth deferred to a manual pass (see PHASE-CLOSURE.md). completed stays false until that pass runs.",
+  "currentTask": "13.1-V10-only-remaining",
+  "notes": "Phases 1-6 done pre-loop (commit 6da51e8). 2026-07-03: sole-writer takeover (concurrent runner stopped). Code complete through Phase 12. BROWSER V-SWEEP RUN 2026-07-03 (commit b36f8b5): V3/V4/V6/V7/V8 all browser-verified green against the live authed session. Found+fixed 2 defects — V3 analytics donut overflow (66px @375) and V8 unlabeled account-type select. V1/V2 green; V5 by construction; V9 core+DB green (literal 2nd-account OAuth click still owner-only). ONLY V10 (price refresh) remains — needs Andre's real Apps Script endpoint+token, un-runnable headless. completed stays false until V10 runs. See PHASE-CLOSURE.md.",
   "phases": {
     "7": {
       "title": "Categories page + all settings managers",
@@ -66,8 +66,8 @@
       "title": "Final sweep + a11y + closure",
       "doneWhen": "V1-V10 green",
       "tasks": [
-        { "id": "13.1", "desc": "V1-V10 sweep — HEADLESS PORTION DONE (V1 build/tsc, V2 reconciliation green; V5/V6/V9 by construction+self-check). Browser V3/V4/V7/V8/V10 + 2nd-account OAuth DEFERRED to owner's manual pass per 2026-07-03 decision.", "status": "partial" },
-        { "id": "13.2", "desc": "Closure report written to PHASE-CLOSURE.md (verification matrix + remaining manual steps). completed left false until the browser sweep runs.", "status": "completed" }
+        { "id": "13.1", "desc": "V1-V10 sweep — BROWSER PASS RUN 2026-07-03 (commit b36f8b5). Green: V1 build/tsc, V2 reconciliation, V3 viewport (375/768/1440 x Ivory/Obsidian; fixed donut overflow), V4 hydration (0 console errors x6 routes), V5 reduced-motion (construction), V6 solar (resolves live, no errors), V7 tnum (0px jitter), V8 a11y (0 label violations after fixing account-select; focus rings present; contrast 8.31-15.51:1), V9 import core+DB. Remaining: V10 price refresh (needs real Apps Script endpoint+token) + literal 2nd-account OAuth click — both owner-only.", "status": "partial" },
+        { "id": "13.2", "desc": "Closure report at PHASE-CLOSURE.md updated with browser-sweep results. completed left false until V10 runs against the real endpoint.", "status": "completed" }
       ]
     }
   }
