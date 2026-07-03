@@ -19,6 +19,7 @@ import {
   userSettings,
 } from "@/db/schema";
 import { requireUserId } from "@/server/auth-helpers";
+import { monthKey, todayISO } from "@/lib/dates";
 import type { ActionResult } from "@/server/actions/transactions";
 
 const uuid = z.string().uuid();
@@ -33,7 +34,7 @@ function revalidate() {
 
 /** Guard: a referenced id must belong to THIS user (FKs alone don't check). */
 async function ownsRow(
-  table: typeof paymentMethods | typeof categories,
+  table: typeof paymentMethods | typeof categories | typeof accounts,
   id: string,
   userId: string,
 ): Promise<boolean> {
@@ -219,6 +220,31 @@ export async function setAccountActive(id: string, active: boolean): Promise<Act
   if (!updated.length) return { ok: false, error: "Not found" };
   revalidate();
   return { ok: true, id };
+}
+
+/** Record/overwrite an account's balance for the CURRENT month (net-worth
+ *  history). Upserts on the (user, account, month) unique key so re-editing the
+ *  same month overwrites rather than stacking rows. */
+export async function saveAccountBalance(raw: unknown): Promise<ActionResult> {
+  const userId = await requireUserId();
+  const parsed = z
+    .object({ accountId: uuid, balanceCents: z.number().int() })
+    .safeParse(raw);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
+  const { accountId, balanceCents } = parsed.data;
+  if (!(await ownsRow(accounts, accountId, userId)))
+    return { ok: false, error: "Unknown account" };
+
+  const month = monthKey(todayISO());
+  await getDb()
+    .insert(netWorthEntries)
+    .values({ id: crypto.randomUUID(), userId, accountId, month, balanceCents })
+    .onConflictDoUpdate({
+      target: [netWorthEntries.userId, netWorthEntries.accountId, netWorthEntries.month],
+      set: { balanceCents },
+    });
+  revalidate();
+  return { ok: true, id: accountId };
 }
 
 /* ------------------------------------------------------------ sinking funds */

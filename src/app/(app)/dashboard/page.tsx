@@ -1,54 +1,74 @@
 import { PageHeader } from "@/components/shell/page-header";
+import { Reveal } from "@/components/motion/reveal";
+import { requireUserId } from "@/server/auth-helpers";
+import { getDashboardSummary } from "@/server/queries/dashboard";
+import { getWealthSummary } from "@/server/queries/wealth";
+import { HeroNumbers } from "@/components/dashboard/hero-numbers";
+import { MonthPulse } from "@/components/dashboard/month-pulse";
+import { BudgetFrameworks } from "@/components/dashboard/budget-frameworks";
+import { WealthCard } from "@/components/dashboard/wealth-card";
+import { AccountCards } from "@/components/dashboard/account-cards";
+import { HoldingsTable } from "@/components/dashboard/holdings-table";
+import { SinkingFunds } from "@/components/dashboard/sinking-funds";
+import { RecentActivity } from "@/components/dashboard/recent-activity";
+import { EmptyState } from "@/components/dashboard/empty-state";
 
-// Placeholder numerals — real widgets on real data land in Phase 9. The tabular
-// serif figures here also serve as the on-screen subject for V7's width test.
-const STATS = [
-  { label: "Net worth", value: "128,940.00", delta: "+2.4% vs June", positive: true },
-  { label: "Spent this month", value: "3,417.62", delta: "48% of budget", positive: false },
-  { label: "Savings rate", value: "31.8%", delta: "Target 30%", positive: true },
-];
+export default async function DashboardPage() {
+  const userId = await requireUserId();
+  const [summary, wealth] = await Promise.all([
+    getDashboardSummary(userId),
+    getWealthSummary(userId),
+  ]);
 
-export default function DashboardPage() {
+  const [y, m] = summary.month.split("-").map(Number);
+  const monthLabel = new Date(y, m - 1, 1).toLocaleDateString("en-MY", {
+    month: "long",
+    year: "numeric",
+  });
+  const budgetTotal = summary.frameworks.reduce((n, f) => n + f.budgetCents, 0);
+
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="July 2026 · Overview"
+        eyebrow={`${monthLabel} · Overview`}
         title="Dashboard"
         description="Your month at a glance — cash flow, budgets, and net worth."
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {STATS.map((s) => (
-          <div
-            key={s.label}
-            className="interactive rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-paper)]"
-          >
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-              {s.label}
-            </p>
-            <p className="tabular font-display mt-3 text-4xl leading-none">
-              {s.label === "Savings rate" ? "" : <span className="text-muted-foreground">RM </span>}
-              {s.value}
-            </p>
-            <p
-              className={`mt-3 text-sm ${
-                s.positive ? "text-income" : "text-muted-foreground"
-              }`}
-            >
-              {s.delta}
-            </p>
-          </div>
-        ))}
-      </div>
+      {!summary.hasAnyData ? (
+        <EmptyState />
+      ) : (
+        <>
+          <Reveal>
+            <HeroNumbers
+              netWorthCents={wealth.netWorthCents}
+              expenseCents={summary.cashflow.expenseCents}
+              budgetCents={budgetTotal}
+              savingsRate={summary.cashflow.savingsRate}
+              targetSavingsRate={summary.cashflow.targetSavingsRate}
+            />
+          </Reveal>
 
-      <div className="rounded-xl border border-dashed border-border bg-card/40 px-6 py-16 text-center">
-        <p className="font-display text-lg text-muted-foreground">
-          Widgets go live once your data lands
-        </p>
-        <p className="mt-1.5 text-sm text-muted-foreground/70">
-          Sign-in, database, and the migration of your 2,000+ transactions come in Phases 4–8.
-        </p>
-      </div>
+          <Reveal className="grid gap-4 lg:grid-cols-2" delay={0.05}>
+            <MonthPulse cashflow={summary.cashflow} />
+            <BudgetFrameworks frameworks={summary.frameworks} />
+          </Reveal>
+
+          <Reveal delay={0.1}>
+            <WealthCard wealth={wealth} />
+          </Reveal>
+
+          <Reveal className="grid gap-4 lg:grid-cols-2" delay={0.15}>
+            <AccountCards accounts={wealth.accounts} />
+            <HoldingsTable holdings={wealth.holdings} />
+          </Reveal>
+
+          <Reveal className="grid gap-4 lg:grid-cols-2" delay={0.2}>
+            <SinkingFunds funds={summary.sinkingFunds} />
+            <RecentActivity rows={summary.recentActivity} />
+          </Reveal>
+        </>
+      )}
     </div>
   );
 }

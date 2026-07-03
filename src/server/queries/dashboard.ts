@@ -1,7 +1,7 @@
 import "server-only";
 import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { getDb } from "@/db/client";
-import { categories, sinkingFunds, transactions } from "@/db/schema";
+import { categories, sinkingFunds, transactions, userSettings } from "@/db/schema";
 import { monthKey, todayISO } from "@/lib/dates";
 
 /* Dashboard read layer — the cash-flow / budget side of the overview (net worth
@@ -49,6 +49,8 @@ export type DashboardSummary = {
      *  deductions (statutory) are pre-income, kept out of the ratio. Components are
      *  all exposed → 9.4 can re-derive against the Sheet without reshaping this. */
     savingsRate: number;
+    /** User's target savings rate (fraction 0..1) from settings, or null. */
+    targetSavingsRate: number | null;
   };
   frameworks: FrameworkRollup[]; // Needs/Wants/Savings spent vs budget
   sinkingFunds: SinkingFundSummary[];
@@ -71,7 +73,7 @@ export async function getDashboardSummary(userId: string): Promise<DashboardSumm
     lte(transactions.date, last),
   );
 
-  const [spendByFramework, budgetByFramework, funds, recent] = await Promise.all([
+  const [spendByFramework, budgetByFramework, funds, recent, settingsRows] = await Promise.all([
     // Live spend this month grouped by the category's framework (Income/Needs/
     // Wants/Savings/Deduction/Transfer all fall out of this one group-by).
     db
@@ -98,6 +100,10 @@ export async function getDashboardSummary(userId: string): Promise<DashboardSumm
       .where(and(eq(sinkingFunds.userId, userId), eq(sinkingFunds.active, true)))
       .orderBy(asc(sinkingFunds.name)),
     getRecentActivity(userId),
+    db
+      .select({ target: userSettings.targetSavingsRate })
+      .from(userSettings)
+      .where(eq(userSettings.userId, userId)),
   ]);
 
   const spend = new Map(spendByFramework.map((r) => [r.framework, Number(r.cents)]));
@@ -114,6 +120,8 @@ export async function getDashboardSummary(userId: string): Promise<DashboardSumm
   const expenseCents = frameworks.reduce((n, f) => n + f.spentCents, 0);
   const netCents = incomeCents - expenseCents - deductionCents;
   const savingsRate = incomeCents > 0 ? (incomeCents - expenseCents) / incomeCents : 0;
+  const targetRaw = settingsRows[0]?.target;
+  const targetSavingsRate = targetRaw != null ? Number(targetRaw) : null;
 
   // Sinking funds: attach this-month spend in each fund's matched category.
   const matchIds = [
@@ -145,7 +153,7 @@ export async function getDashboardSummary(userId: string): Promise<DashboardSumm
 
   return {
     month,
-    cashflow: { incomeCents, expenseCents, deductionCents, netCents, savingsRate },
+    cashflow: { incomeCents, expenseCents, deductionCents, netCents, savingsRate, targetSavingsRate },
     frameworks,
     sinkingFunds: sinkingFundsOut,
     recentActivity: recent,
