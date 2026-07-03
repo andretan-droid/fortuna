@@ -1,15 +1,15 @@
 import { PageHeader } from "@/components/shell/page-header";
-import { ComingSoon } from "@/components/shell/coming-soon";
+import { ImportWizard } from "@/components/import/wizard";
 
 export default function ImportPage() {
   return (
-    <div className="space-y-8">
+    <div className="mx-auto max-w-2xl space-y-8">
       <PageHeader
-        eyebrow="Import"
-        title="Import data"
-        description="Upload an .xlsx / .csv, map columns, preview, and commit."
+        eyebrow="Onboarding"
+        title="Import your data"
+        description="Bring in an existing budget from a spreadsheet — the template's tabs and columns map straight in, validated before anything is written."
       />
-      <ComingSoon phase="Phase 11" />
+      <ImportWizard />
     </div>
   );
 }
