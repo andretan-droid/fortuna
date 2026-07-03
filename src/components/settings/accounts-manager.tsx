@@ -23,6 +23,7 @@ function KindSelect({
   return (
     <select
       id={id}
+      aria-label="Account type"
       value={value}
       onChange={(e) => onChange(e.target.value as "Asset" | "Liability")}
       className="border-input bg-transparent h-9 rounded-md border px-3 text-sm shadow-xs outline-none"

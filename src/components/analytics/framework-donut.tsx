@@ -42,7 +42,7 @@ export function FrameworkDonut({
 
   return (
     <Panel title={`Framework split — ${monthLabel}`}>
-      <div className="flex items-center gap-6">
+      <div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
         <div className="relative shrink-0">
           <svg viewBox="0 0 160 160" className="size-36 -rotate-90" role="img" aria-label="Framework split">
             {segments.map((s) => {
