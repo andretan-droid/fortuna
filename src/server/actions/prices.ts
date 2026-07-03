@@ -8,17 +8,19 @@ import { fxRates, holdings, userSettings } from "@/db/schema";
 import { requireUserId } from "@/server/auth-helpers";
 import type { ActionResult } from "@/server/actions/transactions";
 
-/* Live price refresh (dashboard Refresh button). The external feed contract is
- * not fixed yet, so we accept a deliberately loose JSON shape and skip anything
- * we can't read — this action must DEGRADE, never throw (V10 fault-tolerance).
- *
- * ponytail: assumed shape is { prices: {TICKER: number | {price, dayChangePct}},
- * fx: {PAIR: number} } with a Bearer token. Swap the parse/auth here once the
- * real feed contract is known — nothing else depends on the shape. */
-type FeedQuote = { price?: number; dayChangePct?: number };
+/* Live price refresh (dashboard Refresh button). Talks to the v5 Apps Script
+ * backend: GET <url>?action=bootstrap&token=<token>. That endpoint returns
+ * { ok, data:{ holdings:[{ticker, price, day_chg_pct}], fx:[{pair, rate}] } }
+ * with GOOGLEFINANCE-resolved live values. The token MUST be a query param —
+ * Apps Script /exec 302-redirects to googleusercontent and fetch drops the
+ * Authorization header across that cross-origin hop, so a Bearer header never
+ * authenticates. This action must DEGRADE, never throw (V10 fault-tolerance). */
+type FeedHolding = { ticker?: string; price?: number; day_chg_pct?: number };
+type FeedFx = { pair?: string; rate?: number };
 type FeedShape = {
-  prices?: Record<string, number | FeedQuote>;
-  fx?: Record<string, number>;
+  ok?: boolean;
+  error?: string;
+  data?: { holdings?: FeedHolding[]; fx?: FeedFx[] };
 };
 
 export async function refreshPrices(): Promise<ActionResult> {
@@ -31,20 +33,34 @@ export async function refreshPrices(): Promise<ActionResult> {
     .where(eq(userSettings.userId, userId));
   if (!settings?.url) return { ok: false, error: "Set a price feed URL in Settings first" };
 
+  let feedUrl: string;
+  try {
+    const u = new URL(settings.url);
+    u.searchParams.set("action", "bootstrap");
+    if (settings.token) u.searchParams.set("token", settings.token);
+    feedUrl = u.toString();
+  } catch {
+    return { ok: false, error: "Price feed URL is not valid" };
+  }
+
   let data: FeedShape;
   try {
-    const res = await fetch(settings.url, {
-      headers: settings.token ? { Authorization: `Bearer ${settings.token}` } : {},
-      cache: "no-store",
-    });
+    const res = await fetch(feedUrl, { cache: "no-store" });
     if (!res.ok) return { ok: false, error: `Feed returned ${res.status}` };
     data = (await res.json()) as FeedShape;
   } catch {
     return { ok: false, error: "Could not reach the price feed" };
   }
+  if (data.ok === false) {
+    // e.g. bad/missing token → Apps Script answers { ok:false, error:'Unauthorized' }
+    return { ok: false, error: data.error ?? "Price feed rejected the request" };
+  }
 
-  const prices = data.prices ?? {};
-  const fx = data.fx ?? {};
+  // Index the feed's holdings by upper-cased ticker for lookup.
+  const quotes = new Map<string, FeedHolding>();
+  for (const q of data.data?.holdings ?? []) {
+    if (q.ticker) quotes.set(String(q.ticker).toUpperCase(), q);
+  }
   const now = new Date();
   const writes: BatchItem<"pg">[] = [];
 
@@ -54,10 +70,10 @@ export async function refreshPrices(): Promise<ActionResult> {
     .from(holdings)
     .where(eq(holdings.userId, userId));
   for (const h of held) {
-    const q = prices[h.ticker] ?? prices[h.ticker.toUpperCase()];
+    const q = quotes.get(h.ticker.toUpperCase());
     if (q == null) continue;
-    const price = typeof q === "number" ? q : q.price;
-    const chg = typeof q === "number" ? undefined : q.dayChangePct;
+    const price = q.price;
+    const chg = q.day_chg_pct;
     if (price == null || !Number.isFinite(price)) continue;
     writes.push(
       db
@@ -71,13 +87,13 @@ export async function refreshPrices(): Promise<ActionResult> {
     );
   }
 
-  for (const [pair, rate] of Object.entries(fx)) {
-    if (typeof rate !== "number" || !Number.isFinite(rate)) continue;
+  for (const f of data.data?.fx ?? []) {
+    if (!f.pair || typeof f.rate !== "number" || !Number.isFinite(f.rate)) continue;
     writes.push(
       db
         .update(fxRates)
-        .set({ rateLive: String(rate) })
-        .where(and(eq(fxRates.userId, userId), eq(fxRates.pair, pair))),
+        .set({ rateLive: String(f.rate) })
+        .where(and(eq(fxRates.userId, userId), eq(fxRates.pair, f.pair))),
     );
   }
 
