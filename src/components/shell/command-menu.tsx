@@ -15,13 +15,15 @@ import {
 } from "@/components/ui/command";
 import { NAV_ITEMS } from "./nav";
 import { COMMAND_EVENT } from "@/lib/command";
+import { useThemeMode } from "./theme-mode";
 
 /** ⌘K / Ctrl+K palette, mounted once in AppShell. Navigation is live; the two
  *  action items route to searchParams the owning phases (6/9) will act on. */
 export function CommandMenu() {
   const [open, setOpen] = useState(false);
   const router = useRouter();
-  const { resolvedTheme, setTheme } = useTheme();
+  const { resolvedTheme } = useTheme();
+  const { setMode } = useThemeMode();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -85,7 +87,7 @@ export function CommandMenu() {
           <CommandItem
             value="Toggle theme"
             onSelect={() =>
-              run(() => setTheme(resolvedTheme === "dark" ? "light" : "dark"))
+              run(() => setMode(resolvedTheme === "dark" ? "light" : "dark"))
             }
           >
             {resolvedTheme === "dark" ? <Sun /> : <Moon />}

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ThemeProvider } from "next-themes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
+import { ThemeModeProvider } from "@/components/shell/theme-mode";
 
 /** Client providers wrapping the whole app. next-themes' pre-hydration inline
  *  script is our entire anti-flash defense (see <html suppressHydrationWarning>).
@@ -26,10 +27,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
       enableSystem
       storageKey="fortuna-theme"
     >
-      <QueryClientProvider client={queryClient}>
-        {children}
-        <Toaster position="bottom-right" />
-      </QueryClientProvider>
+      <ThemeModeProvider>
+        <QueryClientProvider client={queryClient}>
+          {children}
+          <Toaster position="bottom-right" />
+        </QueryClientProvider>
+      </ThemeModeProvider>
     </ThemeProvider>
   );
 }

@@ -1,38 +1,37 @@
 "use client";
 
-import { Sun, Moon } from "lucide-react";
-import { useTheme } from "next-themes";
+import { Sun, Moon, Monitor, Sunrise } from "lucide-react";
 import { useMounted } from "@/hooks/use-mounted";
+import { useThemeMode } from "@/components/shell/theme-mode";
+import type { ThemeMode } from "@/lib/solar";
 
-/** Ivory ↔ Obsidian toggle. Mount-gated so SSR and first client paint render an
- *  identical placeholder (no hydration mismatch). Solar/system modes land in P12. */
+/** Cycles the four modes: Ivory → Obsidian → System → Solar. Mount-gated so SSR
+ *  and first client paint render an identical placeholder (no hydration
+ *  mismatch); the real mode is known only after localStorage hydration. */
+const ORDER: ThemeMode[] = ["light", "dark", "system", "solar"];
+const META: Record<ThemeMode, { icon: typeof Sun; label: string }> = {
+  light: { icon: Sun, label: "Ivory (light)" },
+  dark: { icon: Moon, label: "Obsidian (dark)" },
+  system: { icon: Monitor, label: "System" },
+  solar: { icon: Sunrise, label: "Solar (auto by sun)" },
+};
+
 export function ThemeToggle() {
-  const { resolvedTheme, setTheme } = useTheme();
+  const { mode, setMode } = useThemeMode();
   const mounted = useMounted();
-  const isDark = resolvedTheme === "dark";
+
+  const next = ORDER[(ORDER.indexOf(mode) + 1) % ORDER.length];
+  const Icon = META[mode].icon;
 
   return (
     <button
       type="button"
-      onClick={() => setTheme(isDark ? "light" : "dark")}
-      aria-label={
-        !mounted
-          ? "Toggle theme"
-          : isDark
-            ? "Switch to Ivory (light)"
-            : "Switch to Obsidian (dark)"
-      }
+      onClick={() => setMode(next)}
+      aria-label={mounted ? `Theme: ${META[mode].label}. Switch to ${META[next].label}` : "Toggle theme"}
+      title={mounted ? META[mode].label : undefined}
       className="interactive grid size-9 place-items-center rounded-md border border-border text-muted-foreground hover:text-foreground"
     >
-      {mounted ? (
-        isDark ? (
-          <Sun className="size-4" strokeWidth={1.75} />
-        ) : (
-          <Moon className="size-4" strokeWidth={1.75} />
-        )
-      ) : (
-        <span className="size-4" />
-      )}
+      {mounted ? <Icon className="size-4" strokeWidth={1.75} /> : <span className="size-4" />}
     </button>
   );
 }
