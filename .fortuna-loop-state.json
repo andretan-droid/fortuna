@@ -1,8 +1,8 @@
 {
   "completed": false,
-  "currentPhase": 12,
-  "currentTask": "12.3",
-  "notes": "Phases 1-6 done pre-loop (commit 6da51e8). Gate per plan: each phase's 'done when' criteria. Model: Fable 5 until 6AM, Opus 4.8 after (user switches via /model).",
+  "currentPhase": 13,
+  "currentTask": "13.1-browser-DEFERRED",
+  "notes": "Phases 1-6 done pre-loop (commit 6da51e8). 2026-07-03: sole-writer takeover (concurrent runner stopped). Code complete through Phase 12. Owner chose 'headless verify + defer browser' — headless V1/V2 green, V5/V6/V9 verified by construction+self-check; browser V3/V4/V7/V8/V10 + literal 2nd-account OAuth deferred to a manual pass (see PHASE-CLOSURE.md). completed stays false until that pass runs.",
   "phases": {
     "7": {
       "title": "Categories page + all settings managers",
@@ -59,15 +59,15 @@
       "tasks": [
         { "id": "12.1", "desc": "use-solar-theme resolution ladder + fortuna-theme-mode key", "status": "completed", "commit": "7150d8a" },
         { "id": "12.2", "desc": "Motion polish pass through motion/reveal.tsx choke point (added app/(app)/template.tsx per-nav fade)", "status": "completed", "commit": "c58406f" },
-        { "id": "12.3", "desc": "V5 reduced-motion + V6 solar boundary verify; close phase", "status": "pending" }
+        { "id": "12.3", "desc": "V5 reduced-motion + V6 solar boundary — verified headlessly (solar.ts self-check; reveal/template static under reduced-motion by construction). Browser clock-sim deferred to manual pass.", "status": "completed" }
       ]
     },
     "13": {
       "title": "Final sweep + a11y + closure",
       "doneWhen": "V1-V10 green",
       "tasks": [
-        { "id": "13.1", "desc": "Run V1-V10 sweep; fix regressions", "status": "pending" },
-        { "id": "13.2", "desc": "Closure report to workspace; set completed:true; terminate loop", "status": "pending" }
+        { "id": "13.1", "desc": "V1-V10 sweep — HEADLESS PORTION DONE (V1 build/tsc, V2 reconciliation green; V5/V6/V9 by construction+self-check). Browser V3/V4/V7/V8/V10 + 2nd-account OAuth DEFERRED to owner's manual pass per 2026-07-03 decision.", "status": "partial" },
+        { "id": "13.2", "desc": "Closure report written to PHASE-CLOSURE.md (verification matrix + remaining manual steps). completed left false until the browser sweep runs.", "status": "completed" }
       ]
     }
   }
