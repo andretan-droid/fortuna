@@ -2,7 +2,7 @@ import "server-only";
 import { asc, eq, sql } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { categories } from "@/db/schema";
-import { monthKey, todayISO } from "@/lib/dates";
+import { monthBounds, monthKey, todayISO } from "@/lib/dates";
 
 export type CategoryRow = {
   id: string;
@@ -23,8 +23,7 @@ export async function getCategoriesWithSpend(
 ): Promise<CategoryRow[]> {
   const db = getDb();
   const month = monthKey(todayISO()); // 'YYYY-MM'
-  const first = `${month}-01`;
-  const last = `${month}-31`; // date is ISO text-ordered; '-31' bounds any month
+  const { first, nextFirst } = monthBounds(month); // half-open [first, nextFirst)
 
   // NB: columns inside sql`` render UNQUALIFIED — a correlated ${categories.id}
   // becomes bare "id" and PG binds it to the inner table (both tables have id).
@@ -36,7 +35,7 @@ export async function getCategoriesWithSpend(
       and t.category_id = categories.id
       and t.deleted = false
       and t.date >= ${first}
-      and t.date <= ${last}
+      and t.date < ${nextFirst}
   ), 0)`;
 
   const rows = await db

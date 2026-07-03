@@ -21,4 +21,15 @@ export function formatDayHeader(isoDate: string): string {
   });
 }
 
+/** Half-open [first, nextFirst) bounds for a 'YYYY-MM' month. Query a month with
+ *  `date >= first AND date < nextFirst` — NOT `date <= 'YYYY-MM-31'`: the 31st is
+ *  an invalid date in 30-day months and February, which Postgres rejects (22008)
+ *  when the operand is a real `date` column. */
+export function monthBounds(month: string): { first: string; nextFirst: string } {
+  const [y, m] = month.split("-").map(Number);
+  const nextFirst =
+    m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
+  return { first: `${month}-01`, nextFirst };
+}
+
 export const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;

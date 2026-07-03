@@ -1,8 +1,8 @@
 import "server-only";
-import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { categories, sinkingFunds, transactions, userSettings } from "@/db/schema";
-import { monthKey, todayISO } from "@/lib/dates";
+import { monthBounds, monthKey, todayISO } from "@/lib/dates";
 
 /* Dashboard read layer — the cash-flow / budget side of the overview (net worth
  * and portfolio live in queries/wealth.ts). Everything is current-month, exact
@@ -63,14 +63,13 @@ export type DashboardSummary = {
 export async function getDashboardSummary(userId: string): Promise<DashboardSummary> {
   const db = getDb();
   const month = monthKey(todayISO()); // 'YYYY-MM'
-  const first = `${month}-01`;
-  const last = `${month}-31`; // ISO text-ordered; '-31' bounds any month
+  const { first, nextFirst } = monthBounds(month);
 
   const inMonth = and(
     eq(transactions.userId, userId),
     eq(transactions.deleted, false),
     gte(transactions.date, first),
-    lte(transactions.date, last),
+    lt(transactions.date, nextFirst),
   );
 
   const [spendByFramework, budgetByFramework, funds, recent, settingsRows] = await Promise.all([
