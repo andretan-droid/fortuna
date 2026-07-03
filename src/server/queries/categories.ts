@@ -1,7 +1,7 @@
 import "server-only";
 import { asc, eq, sql } from "drizzle-orm";
 import { getDb } from "@/db/client";
-import { categories, transactions } from "@/db/schema";
+import { categories } from "@/db/schema";
 import { monthKey, todayISO } from "@/lib/dates";
 
 export type CategoryRow = {
@@ -26,14 +26,17 @@ export async function getCategoriesWithSpend(
   const first = `${month}-01`;
   const last = `${month}-31`; // date is ISO text-ordered; '-31' bounds any month
 
+  // NB: columns inside sql`` render UNQUALIFIED — a correlated ${categories.id}
+  // becomes bare "id" and PG binds it to the inner table (both tables have id).
+  // So: alias the inner table and write the outer reference as literal text.
   const spent = sql<number>`coalesce((
-    select sum(${transactions.amountCents})
-    from ${transactions}
-    where ${transactions.userId} = ${userId}
-      and ${transactions.categoryId} = ${categories.id}
-      and ${transactions.deleted} = false
-      and ${transactions.date} >= ${first}
-      and ${transactions.date} <= ${last}
+    select sum(t.amount_cents)
+    from transactions t
+    where t.user_id = ${userId}
+      and t.category_id = categories.id
+      and t.deleted = false
+      and t.date >= ${first}
+      and t.date <= ${last}
   ), 0)`;
 
   const rows = await db
