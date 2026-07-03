@@ -121,6 +121,58 @@ const bundleSchema = z.object({
       }),
     )
     .default([]),
+  // ── Portfolio (P8.3): numerics are numbers here, stringified for the
+  //    numeric() columns in buildGraph. bnpl references a category by name. ──
+  holdings: z
+    .array(
+      z.object({
+        ticker: z.string().trim().min(1).max(50),
+        name: z.string().trim().max(200).nullish(),
+        exchange: z.string().trim().max(50).nullish(),
+        shares: z.number().nullish(),
+        avgCostLocal: z.number().nullish(),
+        ccy: z.string().trim().max(10).nullish(),
+        priceLive: z.number().nullish(),
+        dayChgPct: z.number().nullish(),
+        manualPriceOverride: z.number().nullish(),
+      }),
+    )
+    .default([]),
+  fxRates: z
+    .array(
+      z.object({
+        pair: z.string().trim().min(1).max(20),
+        rateLive: z.number().nullish(),
+        fallback: z.number().nullish(),
+      }),
+    )
+    .default([]),
+  snapshots: z
+    .array(
+      z.object({
+        month: z.string().regex(monthRe, "month must be YYYY-MM"),
+        portfolioValueCents: centsInt.nullish(),
+        usdMyrAtSnap: z.number().nullish(),
+        notes: z.string().trim().max(500).nullish(),
+      }),
+    )
+    .default([]),
+  bnplPlans: z
+    .array(
+      z.object({
+        legacyId: z.string().trim().max(200).nullish(),
+        item: z.string().trim().min(1).max(300),
+        platform: z.string().trim().max(100).nullish(),
+        category: name, // → resolved to categoryId (RESTRICT)
+        totalAmountCents: centsNonNeg,
+        nInstalments: z.number().int().min(1),
+        instalmentCents: centsNonNeg,
+        firstDueMonth: z.string().regex(monthRe).nullish(),
+        status: z.string().trim().max(50).default("auto"),
+        notes: z.string().trim().max(500).nullish(),
+      }),
+    )
+    .default([]),
   settings: z
     .object({
       currency: z.string().trim().min(1).max(8).default("RM"),
@@ -149,9 +201,10 @@ export type ImportResult =
   | { ok: true; counts: Record<string, number>; reconciliation: ReconRow[] }
   | { ok: false; errors: string[] };
 
-/* portfolio tables (holdings/fx/snapshots/bnpl) are intentionally out of scope
-   here — they come from a separate sheet tab. ponytail: add a bundle.portfolio
-   collection + inserts in P8.3 once that tab's shape is known. */
+/* Portfolio tables (holdings/fx_rates/snapshots/bnpl_plans) are now in scope
+   (P8.3): the v5 export ships dedicated Holdings/FX/Snapshots/BNPL_Plans tabs.
+   Numerics (shares/prices/rates) are numeric() columns → stringified below;
+   money (bnpl totals, snapshot value) stays integer cents. */
 
 /** Derive the framework invariant: only Expense splits; all else mirrors type. */
 function frameworkFor(
@@ -269,6 +322,53 @@ export function buildGraph(userId: string, bundle: LegacyBundle) {
     active: r.active,
   }));
 
+  // Portfolio rows. numeric() columns take strings; bnpl resolves its category.
+  const holdingRows = b.holdings.map((h) => ({
+    id: crypto.randomUUID(),
+    userId,
+    ticker: h.ticker,
+    name: h.name ?? null,
+    exchange: h.exchange ?? null,
+    shares: h.shares?.toString() ?? null,
+    avgCostLocal: h.avgCostLocal?.toString() ?? null,
+    ccy: h.ccy ?? null,
+    priceLive: h.priceLive?.toString() ?? null,
+    dayChgPct: h.dayChgPct?.toString() ?? null,
+    manualPriceOverride: h.manualPriceOverride?.toString() ?? null,
+  }));
+
+  const fxRateRows = b.fxRates.map((f) => ({
+    id: crypto.randomUUID(),
+    userId,
+    pair: f.pair,
+    rateLive: f.rateLive?.toString() ?? null,
+    fallback: f.fallback?.toString() ?? null,
+  }));
+
+  const snapshotRows = b.snapshots.map((sn) => ({
+    id: crypto.randomUUID(),
+    userId,
+    month: sn.month,
+    portfolioValueCents: sn.portfolioValueCents ?? null,
+    usdMyrAtSnap: sn.usdMyrAtSnap?.toString() ?? null,
+    notes: sn.notes ?? null,
+  }));
+
+  const bnplRows = b.bnplPlans.map((p) => ({
+    id: crypto.randomUUID(),
+    userId,
+    legacyId: p.legacyId ?? null,
+    item: p.item,
+    platform: p.platform ?? null,
+    categoryId: cat(p.category, `bnplPlan "${p.item}"`),
+    totalAmountCents: p.totalAmountCents,
+    nInstalments: p.nInstalments,
+    instalmentCents: p.instalmentCents,
+    firstDueMonth: p.firstDueMonth ?? null,
+    status: p.status,
+    notes: p.notes ?? null,
+  }));
+
   const settingsRow = b.settings
     ? {
         userId,
@@ -301,6 +401,13 @@ export function buildGraph(userId: string, bundle: LegacyBundle) {
       sinkingRows,
       recurringRows: recurringRows as (Omit<
         (typeof recurringRows)[number],
+        "categoryId"
+      > & { categoryId: string })[],
+      holdingRows,
+      fxRateRows,
+      snapshotRows,
+      bnplRows: bnplRows as (Omit<
+        (typeof bnplRows)[number],
         "categoryId"
       > & { categoryId: string })[],
       settingsRow,
@@ -411,6 +518,30 @@ async function reconcile(
       srcSum: 0,
       read: () => countSum(schema.recurringRules, schema.recurringRules.userId, null),
     },
+    {
+      table: "bnpl_plans",
+      src: rows.bnplRows.length,
+      srcSum: sum(rows.bnplRows, "totalAmountCents"),
+      read: () => countSum(schema.bnplPlans, schema.bnplPlans.userId, schema.bnplPlans.totalAmountCents),
+    },
+    {
+      table: "holdings",
+      src: rows.holdingRows.length,
+      srcSum: 0,
+      read: () => countSum(schema.holdings, schema.holdings.userId, null),
+    },
+    {
+      table: "fx_rates",
+      src: rows.fxRateRows.length,
+      srcSum: 0,
+      read: () => countSum(schema.fxRates, schema.fxRates.userId, null),
+    },
+    {
+      table: "snapshots",
+      src: rows.snapshotRows.length,
+      srcSum: sum(rows.snapshotRows, "portfolioValueCents"),
+      read: () => countSum(schema.snapshots, schema.snapshots.userId, schema.snapshots.portfolioValueCents),
+    },
   ];
 
   const out: ReconRow[] = [];
@@ -458,6 +589,10 @@ export async function importLegacyBundle(
     for (const c of chunk(rows.paymentMethodRows)) stmts.push(db.insert(schema.paymentMethods).values(c));
   if (rows.accountRows.length)
     for (const c of chunk(rows.accountRows)) stmts.push(db.insert(schema.accounts).values(c));
+  // bnpl_plans reference categories (RESTRICT) → after categories, before anything
+  // that might reference a plan.
+  if (rows.bnplRows.length)
+    for (const c of chunk(rows.bnplRows)) stmts.push(db.insert(schema.bnplPlans).values(c));
   if (rows.transactionRows.length)
     for (const c of chunk(rows.transactionRows)) stmts.push(db.insert(schema.transactions).values(c));
   if (rows.netWorthRows.length)
@@ -466,6 +601,13 @@ export async function importLegacyBundle(
     for (const c of chunk(rows.sinkingRows)) stmts.push(db.insert(schema.sinkingFunds).values(c));
   if (rows.recurringRows.length)
     for (const c of chunk(rows.recurringRows)) stmts.push(db.insert(schema.recurringRules).values(c));
+  // Portfolio tables scope by user_id only (no intra-domain FK) → any order.
+  if (rows.holdingRows.length)
+    for (const c of chunk(rows.holdingRows)) stmts.push(db.insert(schema.holdings).values(c));
+  if (rows.fxRateRows.length)
+    for (const c of chunk(rows.fxRateRows)) stmts.push(db.insert(schema.fxRates).values(c));
+  if (rows.snapshotRows.length)
+    for (const c of chunk(rows.snapshotRows)) stmts.push(db.insert(schema.snapshots).values(c));
   if (rows.settingsRow)
     stmts.push(
       db
@@ -486,6 +628,10 @@ export async function importLegacyBundle(
     netWorthEntries: rows.netWorthRows.length,
     sinkingFunds: rows.sinkingRows.length,
     recurringRules: rows.recurringRows.length,
+    bnplPlans: rows.bnplRows.length,
+    holdings: rows.holdingRows.length,
+    fxRates: rows.fxRateRows.length,
+    snapshots: rows.snapshotRows.length,
   };
 
   const mismatched = reconciliation.filter((r) => !r.match);
@@ -527,6 +673,21 @@ export function selfCheck() {
   assert(g.errors.length === 1 && g.errors[0].includes("Ghost"), "dangling ref caught");
   assert(g.rows.transactionRows[0].type === "Expense", "txn type derived from category");
   assert(g.rows.categoryRows[0].id === g.rows.transactionRows[0].categoryId, "FK wired");
+
+  // portfolio: bnpl resolves its category; numeric() fields stringify.
+  const g2 = buildGraph("u1", {
+    categories: [{ name: "Shopping", type: "Expense", framework: "Wants" }],
+    bnplPlans: [
+      { item: "Gadget", category: "Shopping", totalAmountCents: 30000, nInstalments: 3, instalmentCents: 10000 },
+      { item: "Ghost", category: "Nope", totalAmountCents: 100, nInstalments: 1, instalmentCents: 100 }, // dangling
+    ],
+    holdings: [{ ticker: "NVDA", shares: 1.5, priceLive: 190.5 }],
+    snapshots: [{ month: "2026-06", portfolioValueCents: 9504843 }],
+  });
+  assert(g2.errors.length === 1 && g2.errors[0].includes("Nope"), "bnpl dangling ref caught");
+  assert(g2.rows.bnplRows[0].categoryId === g2.rows.categoryRows[0].id, "bnpl FK wired");
+  assert(g2.rows.holdingRows[0].shares === "1.5", "holding numeric → string");
+  assert(g2.rows.snapshotRows[0].portfolioValueCents === 9504843, "snapshot cents pass-through");
 
   // eslint-disable-next-line no-console
   console.log("legacy-import selfCheck: OK");

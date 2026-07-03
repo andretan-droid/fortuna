@@ -128,9 +128,12 @@ the inner table (`t`) and write the outer correlation as **literal text**
 - `reconcile()` — reads back count + cent-sum per table; **fails the import on any
   mismatch** (this is the V2 gate's teeth).
 - `selfCheck()` (argv-guarded) verifies graph logic without a DB — green.
-- **Portfolio tables (holdings / fx_rates / snapshots / bnpl_plans) are intentionally
-  deferred** — add a `bundle.portfolio` collection + inserts in 8.3 once that sheet
-  tab's shape is known.
+- **Portfolio tables (holdings / fx_rates / snapshots / bnpl_plans) are NOW in the
+  core** (bundle collections `holdings`, `fxRates`, `snapshots`, `bnplPlans`).
+  numeric() columns (shares/prices/rates) take numbers in the bundle and are
+  stringified in `buildGraph`; bnpl references a category by name; inserts are
+  FK-ordered (bnpl after categories). Reconcile + selfCheck cover them. So 8.3 just
+  needs to *populate* these collections from the sheet's portfolio tabs if present.
 
 **Phase 8.2 (`scripts/seed-legacy.ts` + `npm run seed:legacy`) — DONE:**
 - `npm run seed:legacy -- [--file data/legacy/bundle.json] [--force] [--user <email>]`
@@ -147,11 +150,28 @@ the inner table (`t`) and write the outer correlation as **literal text**
   **format-detection (v4 vs "Ledger")** lives — the two known legacy sheet layouts.
   The mapping is the real work: sheet columns → bundle fields, parse money strings to
   cents with `toCents`, dates to ISO, derive nothing the core already derives
-  (type/framework). Decide here whether to also capture portfolio tabs
-  (holdings/fx/snapshots) → if yes, extend the bundle + core inserts.
-  - **Drive MCP needs Google auth** — if the connector isn't authorized in the fresh
-    session, ask the user to authorize it (claude.ai connector settings); it's a hard
-    blocker for 8.3. (Google Drive tools were available last session.)
+  (type/framework). The core **already accepts** portfolio collections
+  (holdings/fxRates/snapshots/bnplPlans) — just populate them from the sheet's
+  portfolio tabs if the v4 workbook has them.
+  - **SOURCE FILE ALREADY LOCATED (Drive MCP, this session).** The legacy source is
+    **`Ultimate_Budget_Tracker_v4.xlsx`**, Drive fileId
+    **`1QfrHrcE4W7BktpSMVMhuJ83IA39_UkAn`** (owner andretanbusiness@gmail.com,
+    modified 2026-05-30 — the newest of the lineage). This is the "v4" format.
+    Older lineage (v3 `1PFxIfVDuqf7Rp_w_HZSC6123OzORHnyg`, v2, REBUILT) exists but v4
+    is authoritative. The "Ledger" format = the v5-app-era layout (see the
+    `project_budget_tracker_v5` memory) — only relevant if a v5 Ledger sheet is the
+    chosen source instead; default to v4.
+  - **Fresh-chat plan for 8.3:** call `mcp__claude_ai_Google_Drive__read_file_content`
+    with that fileId (openxml spreadsheet is supported → returns NL text of all tabs).
+    Read the tab layout, map each tab to a bundle collection (transactions/ledger →
+    `transactions`; category/budget tab → `categories`; net-worth/accounts tab →
+    `accounts` + `netWorthEntries`; sinking/recurring tabs likewise). Parse money via
+    `toCents`, dates to ISO `YYYY-MM-DD`, months to `YYYY-MM`. Write
+    `data/legacy/bundle.json`. **Do NOT set type/framework** beyond what the core
+    derives — just give each category its `type`. Then `tsc && build` (no app code
+    changed, so it should stay green), commit, advance to 8.4.
+  - **Drive MCP was authorized this session** (Google Drive tools worked). If a fresh
+    session isn't authorized, ask the user to authorize the connector.
 - **8.4:** `npm run seed:legacy -- --force` against the real bundle. **⚠ `--force`
   wipes the app's data** — the current DB holds only manual Phase-7 verification rows
   (fine to wipe). Iterate until V2 reconciliation is **exact-match** (the CLI prints
