@@ -32,4 +32,19 @@ export function monthBounds(month: string): { first: string; nextFirst: string }
   return { first: `${month}-01`, nextFirst };
 }
 
+/** 'YYYY-MM' → 'Jul' (short month, no year — compact chart axis ticks). */
+export function formatMonthShort(month: string): string {
+  const [y, m] = month.split("-").map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString("en-MY", { month: "short" });
+}
+
+/** 'YYYY-MM' → 'July 2026' (month picker options, headers). */
+export function formatMonthLong(month: string): string {
+  const [y, m] = month.split("-").map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString("en-MY", {
+    month: "long",
+    year: "numeric",
+  });
+}
+
 export const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
