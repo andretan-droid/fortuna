@@ -9,7 +9,8 @@
     "lint": "eslint",
     "db:push": "node --env-file=.env.local node_modules/drizzle-kit/bin.cjs push --force",
     "db:generate": "node --env-file=.env.local node_modules/drizzle-kit/bin.cjs generate",
-    "db:studio": "node --env-file=.env.local node_modules/drizzle-kit/bin.cjs studio"
+    "db:studio": "node --env-file=.env.local node_modules/drizzle-kit/bin.cjs studio",
+    "seed:legacy": "tsx scripts/seed-legacy.ts"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.2",
@@ -41,6 +42,7 @@
     "eslint": "^9",
     "eslint-config-next": "15.5.20",
     "tailwindcss": "^4",
+    "tsx": "^4.22.5",
     "typescript": "^5"
   }
 }
