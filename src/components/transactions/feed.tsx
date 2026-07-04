@@ -7,6 +7,7 @@ import type { FeedFilters, FeedPage, FeedRow } from "@/server/queries/transactio
 import { FeedFilters as Filters } from "./feed-filters";
 import { FeedRowItem } from "./feed-row";
 import { QuickLog } from "./quick-log";
+import { BatchAdd } from "./batch-add";
 import { TxnEditor } from "./txn-editor";
 import type { BnplOption, CategoryOption, SimpleOption } from "./txn-form";
 
@@ -67,7 +68,12 @@ export function TransactionsView({
 
   return (
     <div className="space-y-6">
-      <Filters categories={categories} paymentMethods={paymentMethods} />
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <Filters categories={categories} paymentMethods={paymentMethods} />
+        </div>
+        <BatchAdd categories={categories} paymentMethods={paymentMethods} />
+      </div>
 
       {groups.length === 0 ? (
         <div className="rounded-lg border border-dashed py-20 text-center">

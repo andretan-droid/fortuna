@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
+import type { BatchItem } from "drizzle-orm/batch";
 import { z } from "zod";
 import { getDb } from "@/db/client";
 import { transactions, categories, paymentMethods, bnplPlans } from "@/db/schema";
@@ -119,6 +120,73 @@ export async function updateTransaction(
   if (!updated.length) return { ok: false, error: "Transaction not found" };
   revalidate();
   return { ok: true, id };
+}
+
+export type BatchResult = { ok: true; count: number } | { ok: false; error: string };
+
+/** Commit many transactions in ONE atomic db.batch (all-or-nothing, same neon-http
+ *  guarantee as the import wizard). Refs are verified in bulk — one categories +
+ *  one payment-methods read for the whole set — and `type` is derived server-side
+ *  from each row's category, exactly like createTransaction. Any bad row aborts
+ *  the whole commit (the grid pre-filters to valid rows, so this is a backstop). */
+export async function createTransactionsBatch(raw: unknown): Promise<BatchResult> {
+  const userId = await requireUserId();
+  const parsed = z.array(txnInput).min(1, "No rows to add").max(500, "Max 500 at once").safeParse(raw);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
+  const items = parsed.data;
+
+  const db = getDb();
+  const catIds = [...new Set(items.map((i) => i.categoryId))];
+  const pmIds = [...new Set(items.map((i) => i.paymentMethodId).filter((x): x is string => !!x))];
+
+  const [cats, pms] = await Promise.all([
+    db
+      .select({ id: categories.id, type: categories.type })
+      .from(categories)
+      .where(and(eq(categories.userId, userId), inArray(categories.id, catIds))),
+    pmIds.length
+      ? db
+          .select({ id: paymentMethods.id })
+          .from(paymentMethods)
+          .where(and(eq(paymentMethods.userId, userId), inArray(paymentMethods.id, pmIds)))
+      : Promise.resolve([] as { id: string }[]),
+  ]);
+  const typeByCat = new Map(cats.map((c) => [c.id, c.type]));
+  const pmSet = new Set(pms.map((p) => p.id));
+
+  const rows: (typeof transactions.$inferInsert)[] = [];
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    const type = typeByCat.get(it.categoryId);
+    if (!type) return { ok: false, error: `Row ${i + 1}: unknown category` };
+    if (it.paymentMethodId && !pmSet.has(it.paymentMethodId))
+      return { ok: false, error: `Row ${i + 1}: unknown payment method` };
+    rows.push({
+      id: crypto.randomUUID(),
+      userId,
+      date: it.date,
+      amountCents: it.amountCents,
+      description: it.description || null,
+      categoryId: it.categoryId,
+      paymentMethodId: it.paymentMethodId ?? null,
+      bnplPlanId: it.bnplPlanId ?? null,
+      type,
+    });
+  }
+
+  try {
+    // Chunk under the PG bind-parameter ceiling, one implicit txn on neon-http.
+    const stmts: BatchItem<"pg">[] = [];
+    for (let i = 0; i < rows.length; i += 500)
+      stmts.push(db.insert(transactions).values(rows.slice(i, i + 500)));
+    await db.batch(stmts as [BatchItem<"pg">, ...BatchItem<"pg">[]]);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: `Batch add failed: ${msg}` };
+  }
+
+  revalidate();
+  return { ok: true, count: rows.length };
 }
 
 /** Soft delete / restore — ledger history is never hard-deleted. */
