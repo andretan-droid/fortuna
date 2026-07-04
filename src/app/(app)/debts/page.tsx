@@ -2,9 +2,11 @@ import { PageHeader } from "@/components/shell/page-header";
 import { Reveal } from "@/components/motion/reveal";
 import { requireUserId } from "@/server/auth-helpers";
 import { getDebtsSummary } from "@/server/queries/debts";
+import { getReceivablesSummary } from "@/server/queries/receivables";
 import { getWealthSummary } from "@/server/queries/wealth";
 import { getCategoryOptions } from "@/server/queries/transactions";
 import { BnplLadder, LiabilityAccounts } from "@/components/debts/bnpl-ladder";
+import { OwedToMe } from "@/components/debts/owed-to-me";
 import { formatCents } from "@/lib/money";
 import { formatMonthLong } from "@/lib/dates";
 import { cn } from "@/lib/utils";
@@ -14,10 +16,11 @@ import { cn } from "@/lib/utils";
  *  wealth's account list (no extra query). */
 export default async function DebtsPage() {
   const userId = await requireUserId();
-  const [debts, wealth, categories] = await Promise.all([
+  const [debts, wealth, categories, receivables] = await Promise.all([
     getDebtsSummary(userId),
     getWealthSummary(userId),
     getCategoryOptions(userId),
+    getReceivablesSummary(userId),
   ]);
 
   const payoffRange =
@@ -32,7 +35,7 @@ export default async function DebtsPage() {
       <PageHeader
         eyebrow="Debt"
         title="Debts"
-        description="Buy-Now-Pay-Later plans and liability accounts — what you owe and when it clears."
+        description="What you owe — BNPL plans and liability accounts — and what you're owed."
       />
 
       <Reveal className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -66,6 +69,10 @@ export default async function DebtsPage() {
       </Reveal>
 
       <Reveal index={2}>
+        <OwedToMe summary={receivables} />
+      </Reveal>
+
+      <Reveal index={3}>
         <LiabilityAccounts accounts={wealth.accounts} />
       </Reveal>
     </div>

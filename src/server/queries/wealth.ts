@@ -9,8 +9,10 @@ import {
   userSettings,
 } from "@/db/schema";
 import { bnplState } from "@/lib/bnpl";
+import { receivablesState } from "@/lib/receivables";
 import { monthKey, todayISO } from "@/lib/dates";
 import { fetchBnplInputs } from "@/server/queries/debts";
+import { fetchReceivableInputs } from "@/server/queries/receivables";
 
 /* Wealth read layer — net worth (manual account balances) + live portfolio
  * (holdings × price × FX). Kept separate from the ledger queries because this
@@ -46,8 +48,9 @@ export type WealthSummary = {
   accounts: AccountBalance[];
   assetsCents: number; // Σ latest asset balances
   liabilitiesCents: number; // Σ latest liability balances (stored positive)
-  accountsNetCents: number; // (assets − account liabilities − BNPL outstanding)
+  accountsNetCents: number; // (assets + receivables − account liabilities − BNPL outstanding)
   bnplOutstandingCents: number; // Σ active-plan outstanding, folded into liabilities
+  receivablesOutstandingCents: number; // Σ owed to you, folded into assets
   holdings: HoldingValue[];
   portfolioValueCents: number; // Σ live holding market values (MYR)
   netWorthCents: number; // accountsNetCents + portfolioValueCents
@@ -58,7 +61,7 @@ export type WealthSummary = {
 export async function getWealthSummary(userId: string): Promise<WealthSummary> {
   const db = getDb();
 
-  const [acctRows, nweRows, holdingRows, fxRows, settingsRows, bnplInputs] = await Promise.all([
+  const [acctRows, nweRows, holdingRows, fxRows, settingsRows, bnplInputs, recInputs] = await Promise.all([
     db
       .select()
       .from(accounts)
@@ -80,6 +83,7 @@ export async function getWealthSummary(userId: string): Promise<WealthSummary> {
     db.select().from(fxRates).where(eq(fxRates.userId, userId)),
     db.select({ pricesUpdatedAt: userSettings.pricesUpdatedAt }).from(userSettings).where(eq(userSettings.userId, userId)),
     fetchBnplInputs(db, userId),
+    fetchReceivableInputs(db, userId),
   ]);
 
   // asc(month) → the last write for each account wins = its latest balance.
@@ -113,6 +117,13 @@ export async function getWealthSummary(userId: string): Promise<WealthSummary> {
     monthKey(todayISO()),
   ).totalOutstandingCents;
   liabilitiesCents += bnplOutstandingCents;
+  // Receivables (money owed to you) are an asset the account list doesn't capture
+  // — the exact mirror of BNPL. Fold in BEFORE netting so net worth rises by it.
+  const receivablesOutstandingCents = receivablesState(
+    recInputs.receivables,
+    recInputs.payments,
+  ).totalOutstandingCents;
+  assetsCents += receivablesOutstandingCents;
   const accountsNetCents = assetsCents - liabilitiesCents;
 
   // FX map: 'USDMYR' → rate. rateLive is authoritative; fallback until refreshed.
@@ -148,6 +159,7 @@ export async function getWealthSummary(userId: string): Promise<WealthSummary> {
     liabilitiesCents,
     accountsNetCents,
     bnplOutstandingCents,
+    receivablesOutstandingCents,
     holdings: holdingValues,
     portfolioValueCents,
     netWorthCents: accountsNetCents + portfolioValueCents,

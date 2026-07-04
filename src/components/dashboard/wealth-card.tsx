@@ -36,6 +36,12 @@ export function WealthCard({ wealth }: { wealth: WealthSummary }) {
           outstanding.
         </p>
       )}
+      {wealth.receivablesOutstandingCents > 0 && (
+        <p className="mt-1 text-xs text-muted-foreground">
+          Assets include {formatCents(wealth.receivablesOutstandingCents)} owed to
+          you.
+        </p>
+      )}
     </Panel>
   );
 }

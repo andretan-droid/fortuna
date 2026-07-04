@@ -247,6 +247,48 @@ export const transactions = pgTable(
   ],
 );
 
+/* ── Receivables ("Owed to me") ────────────────────────────────────────────
+   The mirror of bnpl_plans: money others owe Andre. Outstanding is DERIVED
+   (lent − Σ payments) from receivable_payments — history is truth, no editable
+   balance field to drift. Counts as an asset in net worth. */
+export const receivables = pgTable(
+  "receivables",
+  {
+    id: uuidPk(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    person: text("person").notNull(),
+    amountCents: bigint("amount_cents", { mode: "number" }).notNull(),
+    date: date("date").notNull(), // 'YYYY-MM-DD' — when it was lent
+    note: text("note"),
+    createdAt: nowTs("created_at"),
+  },
+  (t) => [
+    index("idx_receivables_user").on(t.userId),
+    check("receivables_amount_nonneg", sql`${t.amountCents} >= 0`),
+  ],
+);
+
+export const receivablePayments = pgTable(
+  "receivable_payments",
+  {
+    id: uuidPk(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    receivableId: uuid("receivable_id")
+      .notNull()
+      .references(() => receivables.id, { onDelete: "cascade" }),
+    date: date("date").notNull(),
+    amountCents: bigint("amount_cents", { mode: "number" }).notNull(),
+  },
+  (t) => [
+    index("idx_receivable_payments_rid").on(t.receivableId),
+    check("receivable_payments_amount_nonneg", sql`${t.amountCents} >= 0`),
+  ],
+);
+
 export const holdings = pgTable(
   "holdings",
   {

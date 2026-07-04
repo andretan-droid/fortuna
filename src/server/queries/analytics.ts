@@ -4,7 +4,13 @@ import { getDb } from "@/db/client";
 import { accounts, categories, netWorthEntries, paymentMethods, transactions } from "@/db/schema";
 import { monthBounds, monthKey, todayISO } from "@/lib/dates";
 import { bnplOutstandingAtCents, type BnplPlanInput, type BnplTxnMonth } from "@/lib/bnpl";
+import {
+  receivableOutstandingAtCents,
+  type ReceivableInput,
+  type ReceivablePaymentInput,
+} from "@/lib/receivables";
 import { fetchBnplInputs } from "@/server/queries/debts";
+import { fetchReceivableInputs } from "@/server/queries/receivables";
 
 /* Analytics read layer — month-scoped aggregates + multi-month series for the
  * charts (10.2). Exact integer cents from the ledger, same framework grouping
@@ -96,7 +102,7 @@ export async function getAnalyticsBundle(
     lt(transactions.date, nextFirst),
   );
 
-  const [cashflowRows, breakdownRows, pmRows, nweRows, acctRows, bnplInputs] = await Promise.all([
+  const [cashflowRows, breakdownRows, pmRows, nweRows, acctRows, bnplInputs, recInputs] = await Promise.all([
     // (month, framework) → summed cents across ALL months, pivoted below.
     db
       .select({
@@ -151,6 +157,7 @@ export async function getAnalyticsBundle(
       .from(accounts)
       .where(eq(accounts.userId, userId)),
     fetchBnplInputs(db, userId),
+    fetchReceivableInputs(db, userId),
   ]);
 
   return {
@@ -179,7 +186,14 @@ export async function getAnalyticsBundle(
         spentCents: Number(r.cents),
       }))
       .filter((r) => r.spentCents !== 0),
-    netWorthTrend: netWorthTrend(nweRows, acctRows, bnplInputs.plans, bnplInputs.txns),
+    netWorthTrend: netWorthTrend(
+      nweRows,
+      acctRows,
+      bnplInputs.plans,
+      bnplInputs.txns,
+      recInputs.receivables,
+      recInputs.payments,
+    ),
   };
 }
 
@@ -217,6 +231,8 @@ function netWorthTrend(
   acctRows: { id: string; kind: "Asset" | "Liability" }[],
   plans: BnplPlanInput[],
   bnplTxns: BnplTxnMonth[],
+  receivables: ReceivableInput[],
+  recPayments: ReceivablePaymentInput[],
 ): NetWorthPoint[] {
   if (!nweRows.length) return [];
   const kind = new Map(acctRows.map((a) => [a.id, a.kind]));
@@ -240,6 +256,8 @@ function netWorthTrend(
     // Deviation kept: we iterate net-worth-entry months only, not BNPL-only months.
     const bnpl = bnplOutstandingAtCents(plans, bnplTxns, month);
     liab += bnpl;
+    // Receivables owed to you at month end are an asset (mirror of BNPL).
+    assets += receivableOutstandingAtCents(receivables, recPayments, month);
     out.push({
       month,
       assetsCents: assets,
