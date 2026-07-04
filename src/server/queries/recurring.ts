@@ -71,9 +71,15 @@ export async function getRecurringStatus(
   const todayMonth = monthKey(todayISO());
   const todayDay = Number(todayISO().slice(8, 10));
 
+  // Days in `month`, so a rule's day 29-31 still fires in shorter months.
+  const [yy, mm] = month.split("-").map(Number);
+  const daysInMonth = new Date(yy, mm, 0).getDate();
+
+  const consumed = new Set<number>(); // one txn satisfies at most one rule
   return rules.map((r) => {
     const tol = r.tolerance != null ? Number(r.tolerance) : DEFAULT_TOLERANCE;
-    const match = txns.find((t) => {
+    const matchIdx = txns.findIndex((t, i) => {
+      if (consumed.has(i)) return false;
       if (t.categoryId !== r.categoryId) return false;
       if (r.paymentMethodId && t.paymentMethodId !== r.paymentMethodId) return false;
       if (r.expectedCents != null) {
@@ -82,12 +88,14 @@ export async function getRecurringStatus(
       }
       return true;
     });
+    const match = matchIdx >= 0 ? txns[matchIdx] : undefined;
+    if (matchIdx >= 0) consumed.add(matchIdx);
 
     let status: RecurringStatus;
     if (match) status = "paid";
     else if (month < todayMonth) status = "missed";
     else if (month > todayMonth) status = "due";
-    else if (r.day != null && r.day < todayDay) status = "missed";
+    else if (r.day != null && Math.min(r.day, daysInMonth) < todayDay) status = "missed";
     else status = "due";
 
     return {

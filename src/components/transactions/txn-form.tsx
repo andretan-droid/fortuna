@@ -203,6 +203,8 @@ export function TxnForm({
             inputMode="decimal"
             placeholder="0.00"
             autoComplete="off"
+            aria-invalid={!!error}
+            aria-describedby={error ? "txn-form-error" : undefined}
             className="tabular font-display w-full bg-transparent text-4xl outline-none placeholder:text-muted-foreground/40"
           />
         </div>
@@ -285,7 +287,11 @@ export function TxnForm({
         />
       </div>
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && (
+        <p id="txn-form-error" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
 
       <Button type="submit" size="lg" disabled={pending} className="mt-1">
         {pending ? "Saving…" : submitLabel}

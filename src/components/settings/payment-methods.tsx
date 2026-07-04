@@ -23,16 +23,19 @@ function KindSelect({
   onChange,
   id,
   className,
+  disabled,
 }: {
   value: Kind;
   onChange: (v: Kind) => void;
   id?: string;
   className?: string;
+  disabled?: boolean;
 }) {
   return (
     <select
       id={id}
       aria-label="Payment method type"
+      disabled={disabled}
       value={value}
       onChange={(e) => onChange(e.target.value as Kind)}
       className={cn(
@@ -173,6 +176,7 @@ export function PaymentMethods({ rows }: { rows: PaymentMethodRow[] }) {
                         </button>
                         <KindSelect
                           value={m.kind}
+                          disabled={pending}
                           onChange={(k) =>
                             run(() => setPaymentMethodKind(m.id, k), `"${m.name}" set to ${k}`)
                           }

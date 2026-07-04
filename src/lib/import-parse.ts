@@ -36,6 +36,13 @@ function convert(
         errors.push(`${where}: "${String(raw)}" is not a valid amount`);
         return undefined;
       }
+      // Txn amounts are non-negative by schema (sign lives in the type column);
+      // parens/minus notation must be re-entered as an Income-type row. Account
+      // balances (balanceCents) may legitimately be negative.
+      if (c < 0 && col.field === "amountCents") {
+        errors.push(`${where}: "${String(raw)}" is negative — record refunds as an Income-type row`);
+        return undefined;
+      }
       return c;
     }
     case "int":

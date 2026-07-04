@@ -26,12 +26,11 @@ import type { ActionResult } from "@/server/actions/transactions";
 const uuid = z.string().uuid();
 const cents = z.number().int().nonnegative();
 
-function revalidate() {
-  revalidatePath("/settings");
-  revalidatePath("/dashboard");
-  revalidatePath("/transactions");
-  revalidatePath("/categories");
-  revalidatePath("/debts");
+/** Refresh only the pages that render the changed domain — blanket-invalidating
+ *  all five pages made every rename cost 3+ wasted full-page RSC refetches.
+ *  "/settings" itself is always included. */
+function revalidate(...paths: string[]) {
+  for (const p of new Set(["/settings", ...paths])) revalidatePath(p);
 }
 
 /** Guard: a referenced id must belong to THIS user (FKs alone don't check). */
@@ -81,7 +80,7 @@ export async function saveProfile(raw: unknown): Promise<ActionResult> {
     .insert(userSettings)
     .values({ userId, ...values })
     .onConflictDoUpdate({ target: userSettings.userId, set: values });
-  revalidate();
+  revalidate("/dashboard", "/categories", "/analytics"); // salary + savings target feed budgets & rates
   return { ok: true, id: userId };
 }
 
@@ -129,7 +128,7 @@ export async function createPaymentMethod(raw: unknown): Promise<ActionResult> {
       return { ok: false, error: `"${parsed.data.name}" already exists` };
     throw err;
   }
-  revalidate();
+  revalidate("/transactions", "/analytics");
   return { ok: true, id };
 }
 
@@ -144,7 +143,7 @@ export async function setPaymentMethodKind(id: string, raw: unknown): Promise<Ac
     .where(and(eq(paymentMethods.id, id), eq(paymentMethods.userId, userId)))
     .returning({ id: paymentMethods.id });
   if (!updated.length) return { ok: false, error: "Not found" };
-  revalidate();
+  revalidate("/transactions", "/analytics");
   return { ok: true, id };
 }
 
@@ -166,7 +165,7 @@ export async function renamePaymentMethod(id: string, raw: unknown): Promise<Act
       return { ok: false, error: `"${parsed.data.name}" already exists` };
     throw err;
   }
-  revalidate();
+  revalidate("/transactions", "/analytics");
   return { ok: true, id };
 }
 
@@ -179,7 +178,7 @@ export async function setPaymentMethodActive(id: string, active: boolean): Promi
     .where(and(eq(paymentMethods.id, id), eq(paymentMethods.userId, userId)))
     .returning({ id: paymentMethods.id });
   if (!updated.length) return { ok: false, error: "Not found" };
-  revalidate();
+  revalidate("/transactions", "/analytics");
   return { ok: true, id };
 }
 
@@ -204,7 +203,7 @@ export async function createAccount(raw: unknown): Promise<ActionResult> {
       return { ok: false, error: `"${parsed.data.name}" already exists` };
     throw err;
   }
-  revalidate();
+  revalidate("/dashboard", "/debts", "/analytics");
   return { ok: true, id };
 }
 
@@ -226,7 +225,7 @@ export async function updateAccount(id: string, raw: unknown): Promise<ActionRes
       return { ok: false, error: `"${parsed.data.name}" already exists` };
     throw err;
   }
-  revalidate();
+  revalidate("/dashboard", "/debts", "/analytics");
   return { ok: true, id };
 }
 
@@ -239,7 +238,7 @@ export async function setAccountActive(id: string, active: boolean): Promise<Act
     .where(and(eq(accounts.id, id), eq(accounts.userId, userId)))
     .returning({ id: accounts.id });
   if (!updated.length) return { ok: false, error: "Not found" };
-  revalidate();
+  revalidate("/dashboard", "/debts", "/analytics");
   return { ok: true, id };
 }
 
@@ -264,7 +263,7 @@ export async function saveAccountBalance(raw: unknown): Promise<ActionResult> {
       target: [netWorthEntries.userId, netWorthEntries.accountId, netWorthEntries.month],
       set: { balanceCents },
     });
-  revalidate();
+  revalidate("/dashboard", "/debts", "/analytics");
   return { ok: true, id: accountId };
 }
 
@@ -292,7 +291,7 @@ export async function saveSinkingFund(id: string | null, raw: unknown): Promise<
   if (id === null) {
     const newId = crypto.randomUUID();
     await getDb().insert(sinkingFunds).values({ id: newId, userId, ...d });
-    revalidate();
+    revalidate("/dashboard");
     return { ok: true, id: newId };
   }
   const updated = await getDb()
@@ -301,7 +300,7 @@ export async function saveSinkingFund(id: string | null, raw: unknown): Promise<
     .where(and(eq(sinkingFunds.id, id), eq(sinkingFunds.userId, userId)))
     .returning({ id: sinkingFunds.id });
   if (!updated.length) return { ok: false, error: "Not found" };
-  revalidate();
+  revalidate("/dashboard");
   return { ok: true, id };
 }
 
@@ -314,7 +313,7 @@ export async function deleteSinkingFund(id: string): Promise<ActionResult> {
     .where(and(eq(sinkingFunds.id, id), eq(sinkingFunds.userId, userId)))
     .returning({ id: sinkingFunds.id });
   if (!deleted.length) return { ok: false, error: "Not found" };
-  revalidate();
+  revalidate("/dashboard");
   return { ok: true, id };
 }
 
@@ -346,7 +345,7 @@ export async function saveRecurringRule(id: string | null, raw: unknown): Promis
   if (id === null) {
     const newId = crypto.randomUUID();
     await getDb().insert(recurringRules).values({ id: newId, userId, ...values });
-    revalidate();
+    revalidate("/dashboard");
     return { ok: true, id: newId };
   }
   const updated = await getDb()
@@ -355,7 +354,7 @@ export async function saveRecurringRule(id: string | null, raw: unknown): Promis
     .where(and(eq(recurringRules.id, id), eq(recurringRules.userId, userId)))
     .returning({ id: recurringRules.id });
   if (!updated.length) return { ok: false, error: "Not found" };
-  revalidate();
+  revalidate("/dashboard");
   return { ok: true, id };
 }
 
@@ -367,7 +366,7 @@ export async function deleteRecurringRule(id: string): Promise<ActionResult> {
     .where(and(eq(recurringRules.id, id), eq(recurringRules.userId, userId)))
     .returning({ id: recurringRules.id });
   if (!deleted.length) return { ok: false, error: "Not found" };
-  revalidate();
+  revalidate("/dashboard");
   return { ok: true, id };
 }
 
@@ -401,6 +400,6 @@ export async function wipeAllData(confirmation: string): Promise<ActionResult> {
     const msg = err instanceof Error ? err.message : String(err);
     return { ok: false, error: `Wipe failed: ${msg}` };
   }
-  revalidate();
+  revalidate("/dashboard", "/transactions", "/categories", "/debts", "/analytics");
   return { ok: true, id: userId };
 }

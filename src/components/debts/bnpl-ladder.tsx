@@ -22,6 +22,7 @@ function PlanRow({ p, onEdit }: { p: BnplPlanState; onEdit: () => void }) {
       <button
         type="button"
         onClick={onEdit}
+        aria-label={`Edit ${p.item} plan`}
         className={cn(
           "group w-full py-4 text-left outline-none",
           p.done && "opacity-60",
