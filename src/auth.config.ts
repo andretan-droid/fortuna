@@ -7,6 +7,7 @@ const PROTECTED = [
   "/transactions",
   "/categories",
   "/analytics",
+  "/debts",
   "/import",
   "/settings",
 ];
