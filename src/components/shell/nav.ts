@@ -2,6 +2,7 @@ import {
   LayoutDashboard,
   ArrowLeftRight,
   Tags,
+  CreditCard,
   LineChart,
   Upload,
   Settings,
@@ -12,7 +13,7 @@ export type NavItem = {
   href: string;
   /** Full label — sidebar. */
   label: string;
-  /** Short label — mobile bottom bar (fits 6 tabs at 375px). */
+  /** Short label — mobile bottom bar (fits 7 tabs at 375px). */
   short: string;
   icon: LucideIcon;
 };
@@ -23,6 +24,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", short: "Overview", icon: LayoutDashboard },
   { href: "/transactions", label: "Transactions", short: "Ledger", icon: ArrowLeftRight },
   { href: "/categories", label: "Categories", short: "Budgets", icon: Tags },
+  { href: "/debts", label: "Debts", short: "Debts", icon: CreditCard },
   { href: "/analytics", label: "Analytics", short: "Charts", icon: LineChart },
   { href: "/import", label: "Import", short: "Import", icon: Upload },
   { href: "/settings", label: "Settings", short: "Settings", icon: Settings },

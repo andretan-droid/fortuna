@@ -57,6 +57,16 @@ export const framework = pgEnum("framework", [
   "Transfer",
 ]);
 export const accountKind = pgEnum("account_kind", ["Asset", "Liability"]);
+/** Payment-method category — one source of truth for the enum, zod, and the UI. */
+export const PAYMENT_METHOD_KINDS = [
+  "Bank account",
+  "Credit card",
+  "E-wallet",
+  "BNPL",
+  "Cash",
+  "Other",
+] as const;
+export const paymentMethodKind = pgEnum("payment_method_kind", PAYMENT_METHOD_KINDS);
 
 /* ============================================================================
    Auth.js tables (adapter-standard). Collision fix: the OAuth link table is
@@ -147,6 +157,7 @@ export const paymentMethods = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
+    kind: paymentMethodKind("kind").notNull().default("Other"),
     active: boolean("active").notNull().default(true),
   },
   (t) => [unique("payment_methods_user_name_uq").on(t.userId, t.name)],
@@ -167,24 +178,32 @@ export const accounts = pgTable(
   (t) => [unique("accounts_user_name_uq").on(t.userId, t.name)],
 );
 
-export const bnplPlans = pgTable("bnpl_plans", {
-  id: uuidPk(),
-  userId: text("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  legacyId: text("legacy_id"),
-  item: text("item").notNull(),
-  platform: text("platform"),
-  categoryId: uuid("category_id")
-    .notNull()
-    .references(() => categories.id, { onDelete: "restrict" }),
-  totalAmountCents: bigint("total_amount_cents", { mode: "number" }).notNull(),
-  nInstalments: integer("n_instalments").notNull(),
-  instalmentCents: bigint("instalment_cents", { mode: "number" }).notNull(),
-  firstDueMonth: text("first_due_month"),
-  status: text("status").notNull().default("auto"),
-  notes: text("notes"),
-});
+export const bnplPlans = pgTable(
+  "bnpl_plans",
+  {
+    id: uuidPk(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    legacyId: text("legacy_id"),
+    item: text("item").notNull(),
+    platform: text("platform"),
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => categories.id, { onDelete: "restrict" }),
+    totalAmountCents: bigint("total_amount_cents", { mode: "number" }).notNull(),
+    nInstalments: integer("n_instalments").notNull(),
+    instalmentCents: bigint("instalment_cents", { mode: "number" }).notNull(),
+    firstDueMonth: text("first_due_month"),
+    status: text("status").notNull().default("auto"),
+    notes: text("notes"),
+  },
+  (t) => [
+    check("bnpl_total_nonneg", sql`${t.totalAmountCents} >= 0`),
+    check("bnpl_n_nonneg", sql`${t.nInstalments} >= 0`),
+    check("bnpl_instalment_nonneg", sql`${t.instalmentCents} >= 0`),
+  ],
+);
 
 export const transactions = pgTable(
   "transactions",
@@ -281,6 +300,7 @@ export const snapshots = pgTable(
   (t) => [
     unique("snapshots_user_month_uq").on(t.userId, t.month),
     check("snapshots_month_fmt", sql`${t.month} ~ '^\\d{4}-\\d{2}$'`),
+    check("snapshots_portfolio_nonneg", sql`${t.portfolioValueCents} >= 0`),
   ],
 );
 
@@ -304,22 +324,29 @@ export const netWorthEntries = pgTable(
   ],
 );
 
-export const sinkingFunds = pgTable("sinking_funds", {
-  id: uuidPk(),
-  userId: text("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  annualTargetCents: bigint("annual_target_cents", { mode: "number" }),
-  monthlyAccrualCents: bigint("monthly_accrual_cents", { mode: "number" }),
-  matchCategoryId: uuid("match_category_id").references(() => categories.id, {
-    onDelete: "restrict",
-  }),
-  openingBalanceCents: bigint("opening_balance_cents", { mode: "number" })
-    .notNull()
-    .default(0),
-  active: boolean("active").notNull().default(true),
-});
+export const sinkingFunds = pgTable(
+  "sinking_funds",
+  {
+    id: uuidPk(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    annualTargetCents: bigint("annual_target_cents", { mode: "number" }),
+    monthlyAccrualCents: bigint("monthly_accrual_cents", { mode: "number" }),
+    matchCategoryId: uuid("match_category_id").references(() => categories.id, {
+      onDelete: "restrict",
+    }),
+    openingBalanceCents: bigint("opening_balance_cents", { mode: "number" })
+      .notNull()
+      .default(0),
+    active: boolean("active").notNull().default(true),
+  },
+  (t) => [
+    check("sinking_target_nonneg", sql`${t.annualTargetCents} >= 0`),
+    check("sinking_accrual_nonneg", sql`${t.monthlyAccrualCents} >= 0`),
+  ],
+);
 
 export const recurringRules = pgTable(
   "recurring_rules",
@@ -344,23 +371,31 @@ export const recurringRules = pgTable(
   (t) => [check("recurring_day_range", sql`${t.day} between 1 and 31`)],
 );
 
-export const userSettings = pgTable("user_settings", {
-  userId: text("user_id")
-    .primaryKey()
-    .references(() => users.id, { onDelete: "cascade" }),
-  currency: text("currency").notNull().default("RM"),
-  grossSalaryCents: bigint("gross_salary_cents", { mode: "number" }),
-  statutoryCents: bigint("statutory_cents", { mode: "number" }),
-  netSalaryCents: bigint("net_salary_cents", { mode: "number" }),
-  fxUsdFallback: numeric("fx_usd_fallback", { precision: 24, scale: 8 }),
-  targetSavingsRate: numeric("target_savings_rate", { precision: 6, scale: 4 }),
-  // SET NULL (not RESTRICT): deleting a payment method just clears the default.
-  defaultPaymentMethodId: uuid("default_payment_method_id").references(
-    () => paymentMethods.id,
-    { onDelete: "set null" },
-  ),
-  priceFeedUrl: text("price_feed_url"),
-  priceFeedToken: text("price_feed_token"),
-  pricesUpdatedAt: timestamp("prices_updated_at", { withTimezone: true }),
-  updatedAt: nowTs("updated_at"),
-});
+export const userSettings = pgTable(
+  "user_settings",
+  {
+    userId: text("user_id")
+      .primaryKey()
+      .references(() => users.id, { onDelete: "cascade" }),
+    currency: text("currency").notNull().default("RM"),
+    grossSalaryCents: bigint("gross_salary_cents", { mode: "number" }),
+    statutoryCents: bigint("statutory_cents", { mode: "number" }),
+    netSalaryCents: bigint("net_salary_cents", { mode: "number" }),
+    fxUsdFallback: numeric("fx_usd_fallback", { precision: 24, scale: 8 }),
+    targetSavingsRate: numeric("target_savings_rate", { precision: 6, scale: 4 }),
+    // SET NULL (not RESTRICT): deleting a payment method just clears the default.
+    defaultPaymentMethodId: uuid("default_payment_method_id").references(
+      () => paymentMethods.id,
+      { onDelete: "set null" },
+    ),
+    priceFeedUrl: text("price_feed_url"),
+    priceFeedToken: text("price_feed_token"),
+    pricesUpdatedAt: timestamp("prices_updated_at", { withTimezone: true }),
+    updatedAt: nowTs("updated_at"),
+  },
+  (t) => [
+    check("settings_gross_nonneg", sql`${t.grossSalaryCents} >= 0`),
+    check("settings_statutory_nonneg", sql`${t.statutoryCents} >= 0`),
+    check("settings_net_nonneg", sql`${t.netSalaryCents} >= 0`),
+  ],
+);

@@ -10,6 +10,7 @@ import {
   type PreviewResult,
   type CommitResult,
 } from "@/server/actions/import";
+import { TEMPLATE } from "@/lib/import-template";
 
 /** Import wizard: upload → preview (auto-mapped via the template spec) → commit.
  *  All parsing/validation is server-side (actions/import → lib/legacy-import);
@@ -167,6 +168,46 @@ export function ImportWizard() {
             Fill the template (or export your existing sheet with the same tab/column names), then
             upload it below.
           </p>
+
+          <details className="mt-3 rounded-lg border border-border">
+            <summary className="interactive cursor-pointer select-none px-3 py-2 text-sm font-medium">
+              What columns go in each sheet?
+            </summary>
+            <div className="space-y-4 border-t border-border px-3 py-3">
+              {TEMPLATE.map((s) => (
+                <div key={s.sheet}>
+                  <div className="mb-1.5 text-sm font-medium">{s.sheet}</div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="text-muted-foreground">
+                        <tr className="border-b border-border">
+                          <th className="py-1 pr-4 font-medium">Column</th>
+                          <th className="py-1 pr-4 font-medium">Type</th>
+                          <th className="py-1 font-medium">Example</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {s.cols.map((c) => (
+                          <tr key={c.header} className="border-b border-border/50 last:border-0">
+                            <td className="py-1 pr-4">{c.header}</td>
+                            <td className="py-1 pr-4 text-muted-foreground">{COL_KIND_LABEL[c.kind]}</td>
+                            <td className="py-1 tabular text-muted-foreground">
+                              {c.sample === "" ? "—" : String(c.sample)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
+              <p className="text-xs text-muted-foreground">
+                Money columns are plain amounts (e.g. <span className="tabular">45.90</span>) — no
+                currency symbol. Dates are <span className="tabular">YYYY-MM-DD</span>, months are{" "}
+                <span className="tabular">YYYY-MM</span>.
+              </p>
+            </div>
+          </details>
         </div>
 
         <label className="interactive flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-dashed border-input px-6 py-10 text-center hover:bg-accent">
@@ -192,6 +233,16 @@ export function ImportWizard() {
     </Card>
   );
 }
+
+const COL_KIND_LABEL: Record<string, string> = {
+  text: "Text",
+  money: "Amount",
+  int: "Whole number",
+  number: "Number",
+  bool: "Yes / No",
+  date: "Date",
+  month: "Month",
+};
 
 function Card({ children }: { children: React.ReactNode }) {
   return (

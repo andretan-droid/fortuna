@@ -9,6 +9,7 @@ import { formatCents } from "@/lib/money";
 import { setCategoryActive } from "@/server/actions/categories";
 import type { CategoryRow } from "@/server/queries/categories";
 import { CategoryEditor } from "./category-editor";
+import { GroupManager } from "./group-manager";
 
 /* Display order mirrors the legacy sheet's framework hierarchy. */
 const FRAMEWORK_ORDER = ["Needs", "Wants", "Savings", "Income", "Deduction", "Transfer"];
@@ -57,6 +58,16 @@ export function CategoryManager({ rows }: { rows: CategoryRow[] }) {
 
   const archivedCount = rows.length - rows.filter((r) => r.active).length;
 
+  // Distinct main-category names across ALL rows (incl. archived) — the group
+  // picker's option list. No new table; groups are just these values.
+  const groupNames = useMemo(
+    () =>
+      [...new Set(rows.map((r) => r.mainCategory).filter((m): m is string => !!m))].sort(
+        (a, b) => a.localeCompare(b),
+      ),
+    [rows],
+  );
+
   function toggleActive(row: CategoryRow) {
     startTransition(async () => {
       const res = await setCategoryActive(row.id, !row.active);
@@ -101,9 +112,12 @@ export function CategoryManager({ rows }: { rows: CategoryRow[] }) {
         >
           {showArchived ? "Hide archived" : `Show archived (${archivedCount})`}
         </button>
-        <Button onClick={() => setEditing("new")}>
-          <Plus className="size-4" /> New category
-        </Button>
+        <div className="flex items-center gap-2">
+          <GroupManager rows={rows} />
+          <Button onClick={() => setEditing("new")}>
+            <Plus className="size-4" /> New category
+          </Button>
+        </div>
       </div>
 
       {groups.length === 0 ? (
@@ -116,7 +130,7 @@ export function CategoryManager({ rows }: { rows: CategoryRow[] }) {
       ) : (
         groups.map((g) => (
           <section key={g.framework}>
-            <h2 className="font-display mb-2 text-sm text-muted-foreground">
+            <h2 className="glass font-display sticky top-16 z-10 mb-2 -mx-2 rounded-lg px-2 py-1.5 text-sm text-muted-foreground">
               {g.framework}
               <span className="tabular ml-2 text-xs">
                 {g.budget > 0 &&
@@ -187,6 +201,7 @@ export function CategoryManager({ rows }: { rows: CategoryRow[] }) {
       <CategoryEditor
         key={editing === "new" ? "new" : (editing?.id ?? "closed")}
         row={editing}
+        groups={groupNames}
         onClose={() => setEditing(null)}
       />
     </div>

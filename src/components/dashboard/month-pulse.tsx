@@ -1,4 +1,7 @@
+"use client";
+
 import { Panel } from "./panel";
+import { ChartTipSurface, TipHead, TipRow, useChartTip } from "@/components/charts/tooltip";
 import { formatCents } from "@/lib/money";
 import type { DashboardSummary } from "@/server/queries/dashboard";
 
@@ -10,18 +13,19 @@ export function MonthPulse({ cashflow }: { cashflow: DashboardSummary["cashflow"
 
   return (
     <Panel title="This month">
-      <div className="space-y-4">
-        <Bar label="Income" cents={incomeCents} pct={(incomeCents / max) * 100} tone="income" />
-        <Bar label="Expense" cents={expenseCents} pct={(expenseCents / max) * 100} tone="expense" />
+      <ChartTipSurface className="space-y-4">
+        <Bar label="Income" cents={incomeCents} pct={(incomeCents / max) * 100} tone="income" income={incomeCents} />
+        <Bar label="Expense" cents={expenseCents} pct={(expenseCents / max) * 100} tone="expense" income={incomeCents} />
         {deductionCents > 0 && (
           <Bar
             label="Deductions"
             cents={deductionCents}
             pct={(deductionCents / max) * 100}
             tone="muted"
+            income={incomeCents}
           />
         )}
-      </div>
+      </ChartTipSurface>
       <div className="mt-5 flex items-baseline justify-between border-t border-border pt-4">
         <span className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
           Net
@@ -42,16 +46,32 @@ function Bar({
   cents,
   pct,
   tone,
+  income,
 }: {
   label: string;
   cents: number;
   pct: number;
   tone: "income" | "expense" | "muted";
+  income: number;
 }) {
+  const { show, hide } = useChartTip();
   const fill =
     tone === "income" ? "bg-income" : tone === "expense" ? "bg-brand" : "bg-muted-foreground/50";
+  const tip = (
+    <>
+      <TipHead>{label}</TipHead>
+      <TipRow label="Amount" value={formatCents(cents)} />
+      {tone !== "income" && income > 0 && (
+        <TipRow label="of income" value={`${Math.round((cents / income) * 100)}%`} />
+      )}
+    </>
+  );
   return (
-    <div>
+    <div
+      className="cursor-default"
+      onPointerMove={(e) => show(e.clientX, e.clientY, tip)}
+      onPointerLeave={hide}
+    >
       <div className="mb-1 flex items-baseline justify-between text-sm">
         <span className="text-muted-foreground">{label}</span>
         <span className="tabular">{formatCents(cents)}</span>

@@ -12,6 +12,7 @@ import {
   holdings,
   netWorthEntries,
   paymentMethods,
+  PAYMENT_METHOD_KINDS,
   recurringRules,
   sinkingFunds,
   snapshots,
@@ -30,6 +31,7 @@ function revalidate() {
   revalidatePath("/dashboard");
   revalidatePath("/transactions");
   revalidatePath("/categories");
+  revalidatePath("/debts");
 }
 
 /** Guard: a referenced id must belong to THIS user (FKs alone don't check). */
@@ -109,20 +111,39 @@ export async function savePriceFeed(raw: unknown): Promise<ActionResult> {
 /* -------------------------------------------------------- payment methods */
 
 const nameInput = z.object({ name: z.string().trim().min(1, "Name is required").max(100) });
+const paymentKind = z.enum(PAYMENT_METHOD_KINDS);
+const paymentMethodInput = nameInput.extend({ kind: paymentKind.default("Other") });
 
 export async function createPaymentMethod(raw: unknown): Promise<ActionResult> {
   const userId = await requireUserId();
-  const parsed = nameInput.safeParse(raw);
+  const parsed = paymentMethodInput.safeParse(raw);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
 
   const id = crypto.randomUUID();
   try {
-    await getDb().insert(paymentMethods).values({ id, userId, name: parsed.data.name });
+    await getDb()
+      .insert(paymentMethods)
+      .values({ id, userId, name: parsed.data.name, kind: parsed.data.kind });
   } catch (err) {
     if (err instanceof Error && /unique|duplicate/i.test(err.message))
       return { ok: false, error: `"${parsed.data.name}" already exists` };
     throw err;
   }
+  revalidate();
+  return { ok: true, id };
+}
+
+export async function setPaymentMethodKind(id: string, raw: unknown): Promise<ActionResult> {
+  const userId = await requireUserId();
+  if (!uuid.safeParse(id).success) return { ok: false, error: "Bad id" };
+  const parsed = paymentKind.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: "Unknown category" };
+  const updated = await getDb()
+    .update(paymentMethods)
+    .set({ kind: parsed.data })
+    .where(and(eq(paymentMethods.id, id), eq(paymentMethods.userId, userId)))
+    .returning({ id: paymentMethods.id });
+  if (!updated.length) return { ok: false, error: "Not found" };
   revalidate();
   return { ok: true, id };
 }
@@ -360,20 +381,26 @@ export async function wipeAllData(confirmation: string): Promise<ActionResult> {
     return { ok: false, error: "Type the confirmation phrase exactly" };
 
   const db = getDb();
-  await db.batch([
-    db.delete(transactions).where(eq(transactions.userId, userId)),
-    db.delete(netWorthEntries).where(eq(netWorthEntries.userId, userId)),
-    db.delete(recurringRules).where(eq(recurringRules.userId, userId)),
-    db.delete(sinkingFunds).where(eq(sinkingFunds.userId, userId)),
-    db.delete(bnplPlans).where(eq(bnplPlans.userId, userId)),
-    db.delete(holdings).where(eq(holdings.userId, userId)),
-    db.delete(fxRates).where(eq(fxRates.userId, userId)),
-    db.delete(snapshots).where(eq(snapshots.userId, userId)),
-    db.delete(userSettings).where(eq(userSettings.userId, userId)),
-    db.delete(accounts).where(eq(accounts.userId, userId)),
-    db.delete(categories).where(eq(categories.userId, userId)),
-    db.delete(paymentMethods).where(eq(paymentMethods.userId, userId)),
-  ]);
+  try {
+    await db.batch([
+      db.delete(transactions).where(eq(transactions.userId, userId)),
+      db.delete(netWorthEntries).where(eq(netWorthEntries.userId, userId)),
+      db.delete(recurringRules).where(eq(recurringRules.userId, userId)),
+      db.delete(sinkingFunds).where(eq(sinkingFunds.userId, userId)),
+      db.delete(bnplPlans).where(eq(bnplPlans.userId, userId)),
+      db.delete(holdings).where(eq(holdings.userId, userId)),
+      db.delete(fxRates).where(eq(fxRates.userId, userId)),
+      db.delete(snapshots).where(eq(snapshots.userId, userId)),
+      db.delete(userSettings).where(eq(userSettings.userId, userId)),
+      db.delete(accounts).where(eq(accounts.userId, userId)),
+      db.delete(categories).where(eq(categories.userId, userId)),
+      db.delete(paymentMethods).where(eq(paymentMethods.userId, userId)),
+    ]);
+  } catch (err) {
+    // db.batch throwing must travel as data — actions never throw.
+    const msg = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: `Wipe failed: ${msg}` };
+  }
   revalidate();
   return { ok: true, id: userId };
 }

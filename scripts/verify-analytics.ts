@@ -10,9 +10,10 @@
  * Read-only (SELECTs only).
  */
 import { readFileSync } from "node:fs";
-import { and, asc, desc, eq, gte, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNotNull, lt, sql } from "drizzle-orm";
 import { getDb } from "@/db/client";
-import { accounts, categories, netWorthEntries, transactions, users } from "@/db/schema";
+import { accounts, bnplPlans, categories, netWorthEntries, transactions, users } from "@/db/schema";
+import { bnplOutstandingAtCents, type BnplPlanInput, type BnplTxnMonth } from "@/lib/bnpl";
 import { formatCents } from "@/lib/money";
 import { monthBounds, monthKey, todayISO } from "@/lib/dates";
 
@@ -66,7 +67,7 @@ async function categoryAndFramework(db: Db, userId: string, month: string) {
 }
 
 async function netWorthTrend(db: Db, userId: string) {
-  const [nwe, accts] = await Promise.all([
+  const [nwe, accts, planRows, txnRows] = await Promise.all([
     db
       .select({
         accountId: netWorthEntries.accountId,
@@ -77,11 +78,41 @@ async function netWorthTrend(db: Db, userId: string) {
       .where(eq(netWorthEntries.userId, userId))
       .orderBy(asc(netWorthEntries.month)),
     db.select({ id: accounts.id, kind: accounts.kind }).from(accounts).where(eq(accounts.userId, userId)),
+    // BNPL inputs re-derived here (not via queries/debts) so a wiring bug there
+    // can't hide behind itself — same independence rule as the rest of the file.
+    db
+      .select({
+        id: bnplPlans.id,
+        item: bnplPlans.item,
+        platform: bnplPlans.platform,
+        totalAmountCents: bnplPlans.totalAmountCents,
+        nInstalments: bnplPlans.nInstalments,
+        instalmentCents: bnplPlans.instalmentCents,
+        firstDueMonth: bnplPlans.firstDueMonth,
+        status: bnplPlans.status,
+      })
+      .from(bnplPlans)
+      .where(eq(bnplPlans.userId, userId)),
+    db
+      .select({ planId: transactions.bnplPlanId, date: transactions.date })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.userId, userId),
+          eq(transactions.type, "Expense"),
+          eq(transactions.deleted, false),
+          isNotNull(transactions.bnplPlanId),
+        ),
+      ),
   ]);
   const kind = new Map(accts.map((a) => [a.id, a.kind]));
+  const plans: BnplPlanInput[] = planRows;
+  const bnplTxns: BnplTxnMonth[] = txnRows
+    .filter((t): t is { planId: string; date: string } => t.planId != null)
+    .map((t) => ({ planId: t.planId, month: monthKey(t.date) }));
   const months = [...new Set(nwe.map((r) => r.month))].sort();
 
-  console.log(`\n── net-worth trend (carry-forward, accounts only) ──`);
+  console.log(`\n── net-worth trend (carry-forward; liab incl. BNPL outstanding) ──`);
   for (const month of months) {
     const latest = new Map<string, number>();
     for (const r of nwe) if (r.month <= month) latest.set(r.accountId, r.balanceCents);
@@ -91,7 +122,11 @@ async function netWorthTrend(db: Db, userId: string) {
       if (kind.get(id) === "Liability") liab += bal;
       else assets += bal;
     }
-    console.log(`  ${month}   assets ${formatCents(assets).padStart(15)}   liab ${formatCents(liab).padStart(12)}   net ${formatCents(assets - liab).padStart(15)}`);
+    const bnpl = bnplOutstandingAtCents(plans, bnplTxns, month);
+    liab += bnpl; // legacy calc.js:259-260 parity — BNPL is a liability each month
+    console.log(
+      `  ${month}   assets ${formatCents(assets).padStart(15)}   liab ${formatCents(liab).padStart(12)}   (bnpl ${formatCents(bnpl).padStart(10)})   net ${formatCents(assets - liab).padStart(15)}`,
+    );
   }
 }
 

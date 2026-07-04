@@ -1,22 +1,43 @@
-import { Panel } from "./panel";
+import { ExpandablePanel } from "./expandable-panel";
 import { BalanceEditor } from "./balance-editor";
 import { formatCents } from "@/lib/money";
 import type { AccountBalance } from "@/server/queries/wealth";
 
-/** Per-account latest balance with inline edit. Assets then liabilities; an
- *  account with no recorded balance shows "Not set" and a Set-balance action. */
+/** Per-account latest balance with inline edit. Collapsed to a totals summary;
+ *  expands in place to the per-account rows. Assets then liabilities. */
 export function AccountCards({ accounts }: { accounts: AccountBalance[] }) {
   if (!accounts.length) return null;
   const assets = accounts.filter((a) => a.kind === "Asset");
   const liabilities = accounts.filter((a) => a.kind === "Liability");
+  const sum = (rows: AccountBalance[]) => rows.reduce((n, a) => n + (a.balanceCents ?? 0), 0);
+
+  const summary = (
+    <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+      <span className="text-sm text-muted-foreground">
+        {accounts.length} account{accounts.length === 1 ? "" : "s"}
+      </span>
+      {assets.length > 0 && (
+        <span className="tabular text-sm">
+          <span className="text-muted-foreground">Assets </span>
+          {formatCents(sum(assets))}
+        </span>
+      )}
+      {liabilities.length > 0 && (
+        <span className="tabular text-sm">
+          <span className="text-muted-foreground">Liabilities </span>
+          {formatCents(sum(liabilities))}
+        </span>
+      )}
+    </div>
+  );
 
   return (
-    <Panel title="Accounts">
+    <ExpandablePanel title="Accounts" summary={summary}>
       <div className="space-y-5">
         {assets.length > 0 && <Group heading="Assets" rows={assets} />}
         {liabilities.length > 0 && <Group heading="Liabilities" rows={liabilities} />}
       </div>
-    </Panel>
+    </ExpandablePanel>
   );
 }
 

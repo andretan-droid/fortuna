@@ -3,9 +3,11 @@ import { Reveal } from "@/components/motion/reveal";
 import { requireUserId } from "@/server/auth-helpers";
 import { getDashboardSummary } from "@/server/queries/dashboard";
 import { getWealthSummary } from "@/server/queries/wealth";
+import { getRecurringStatus } from "@/server/queries/recurring";
 import { HeroNumbers } from "@/components/dashboard/hero-numbers";
 import { MonthPulse } from "@/components/dashboard/month-pulse";
 import { BudgetFrameworks } from "@/components/dashboard/budget-frameworks";
+import { UpcomingBills } from "@/components/dashboard/upcoming-bills";
 import { WealthCard } from "@/components/dashboard/wealth-card";
 import { AccountCards } from "@/components/dashboard/account-cards";
 import { HoldingsTable } from "@/components/dashboard/holdings-table";
@@ -15,9 +17,10 @@ import { EmptyState } from "@/components/dashboard/empty-state";
 
 export default async function DashboardPage() {
   const userId = await requireUserId();
-  const [summary, wealth] = await Promise.all([
+  const [summary, wealth, recurring] = await Promise.all([
     getDashboardSummary(userId),
     getWealthSummary(userId),
+    getRecurringStatus(userId),
   ]);
 
   const [y, m] = summary.month.split("-").map(Number);
@@ -49,23 +52,29 @@ export default async function DashboardPage() {
             />
           </Reveal>
 
-          <Reveal className="grid gap-4 lg:grid-cols-2" delay={0.05}>
+          <Reveal className="grid gap-4 lg:grid-cols-2" index={1}>
             <MonthPulse cashflow={summary.cashflow} />
             <BudgetFrameworks frameworks={summary.frameworks} />
           </Reveal>
 
-          <Reveal delay={0.1}>
+          {recurring.length > 0 && (
+            <Reveal index={2}>
+              <UpcomingBills rows={recurring} />
+            </Reveal>
+          )}
+
+          <Reveal index={2}>
             <WealthCard wealth={wealth} />
           </Reveal>
 
-          <Reveal className="grid gap-4 lg:grid-cols-2" delay={0.15}>
-            <AccountCards accounts={wealth.accounts} />
+          <Reveal className="grid gap-4 lg:grid-cols-2" index={3}>
+            <RecentActivity rows={summary.recentActivity} />
             <HoldingsTable holdings={wealth.holdings} />
           </Reveal>
 
-          <Reveal className="grid gap-4 lg:grid-cols-2" delay={0.2}>
+          <Reveal className="grid gap-4 lg:grid-cols-2" index={4}>
             <SinkingFunds funds={summary.sinkingFunds} />
-            <RecentActivity rows={summary.recentActivity} />
+            <AccountCards accounts={wealth.accounts} />
           </Reveal>
         </>
       )}

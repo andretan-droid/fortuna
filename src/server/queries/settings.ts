@@ -10,6 +10,16 @@ import {
 } from "@/db/schema";
 
 export type SettingsProfile = typeof userSettings.$inferSelect | null;
+
+/** Net (take-home) salary in cents, or null if unset. Cheap single-column read
+ *  for the categories metrics header + budget-cap checks. */
+export async function getNetSalaryCents(userId: string): Promise<number | null> {
+  const [row] = await getDb()
+    .select({ netSalaryCents: userSettings.netSalaryCents })
+    .from(userSettings)
+    .where(eq(userSettings.userId, userId));
+  return row?.netSalaryCents ?? null;
+}
 export type PaymentMethodRow = typeof paymentMethods.$inferSelect;
 export type AccountRow = typeof accounts.$inferSelect;
 export type SinkingFundRow = typeof sinkingFunds.$inferSelect;

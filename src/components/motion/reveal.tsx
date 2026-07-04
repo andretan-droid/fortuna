@@ -4,16 +4,19 @@ import { useEffect, useRef } from "react";
 import { motion, useMotionValue, useSpring, useReducedMotion } from "motion/react";
 import { fadeRise, staggerContainer } from "@/lib/motion";
 
-/** Single reveal. When reduced-motion is requested, renders a plain div at full
- *  opacity — never a motion component that could stick at opacity 0 (V5). */
+/** Fires once when scrolled into view (not on mount) so content below the fold
+ *  animates as you reach it. `index` is the element's order down the page — it
+ *  drives fadeRise's descending-duration cascade via `custom`. Reduced-motion →
+ *  plain div at full opacity (never a motion component that could stick at
+ *  opacity 0, V5). */
 export function Reveal({
   children,
   className,
-  delay = 0,
+  index = 0,
 }: {
   children: React.ReactNode;
   className?: string;
-  delay?: number;
+  index?: number;
 }) {
   const reduce = useReducedMotion();
   if (reduce) return <div className={className}>{children}</div>;
@@ -21,9 +24,10 @@ export function Reveal({
     <motion.div
       className={className}
       variants={fadeRise}
+      custom={index}
       initial="hidden"
-      animate="show"
-      transition={{ delay }}
+      whileInView="show"
+      viewport={{ once: true, amount: 0.25, margin: "0px 0px -8% 0px" }}
     >
       {children}
     </motion.div>
@@ -31,7 +35,9 @@ export function Reveal({
 }
 
 /** Stagger parent — children using `fadeRise` (or motion.* with variants)
- *  cascade in. Reduced-motion → static full-opacity div. */
+ *  cascade in when the group scrolls into view. Reduced-motion → static
+ *  full-opacity div. Wrap STATIC zones only: with `once:true`, children mounted
+ *  after the group first enters view stay hidden. */
 export function StaggerGroup({
   children,
   className,
@@ -46,7 +52,8 @@ export function StaggerGroup({
       className={className}
       variants={staggerContainer}
       initial="hidden"
-      animate="show"
+      whileInView="show"
+      viewport={{ once: true, amount: 0.2, margin: "0px 0px -8% 0px" }}
     >
       {children}
     </motion.div>

@@ -30,6 +30,12 @@ export function WealthCard({ wealth }: { wealth: WealthSummary }) {
         <Line label="Liabilities" cents={-wealth.liabilitiesCents} />
         <Line label="Portfolio" cents={wealth.portfolioValueCents} />
       </dl>
+      {wealth.bnplOutstandingCents > 0 && (
+        <p className="mt-3 text-xs text-muted-foreground">
+          Liabilities include {formatCents(wealth.bnplOutstandingCents)} of BNPL
+          outstanding.
+        </p>
+      )}
     </Panel>
   );
 }

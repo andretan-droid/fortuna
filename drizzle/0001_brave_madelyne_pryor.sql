@@ -1,0 +1,9 @@
+ALTER TABLE "bnpl_plans" ADD CONSTRAINT "bnpl_total_nonneg" CHECK ("bnpl_plans"."total_amount_cents" >= 0);--> statement-breakpoint
+ALTER TABLE "bnpl_plans" ADD CONSTRAINT "bnpl_n_nonneg" CHECK ("bnpl_plans"."n_instalments" >= 0);--> statement-breakpoint
+ALTER TABLE "bnpl_plans" ADD CONSTRAINT "bnpl_instalment_nonneg" CHECK ("bnpl_plans"."instalment_cents" >= 0);--> statement-breakpoint
+ALTER TABLE "sinking_funds" ADD CONSTRAINT "sinking_target_nonneg" CHECK ("sinking_funds"."annual_target_cents" >= 0);--> statement-breakpoint
+ALTER TABLE "sinking_funds" ADD CONSTRAINT "sinking_accrual_nonneg" CHECK ("sinking_funds"."monthly_accrual_cents" >= 0);--> statement-breakpoint
+ALTER TABLE "snapshots" ADD CONSTRAINT "snapshots_portfolio_nonneg" CHECK ("snapshots"."portfolio_value_cents" >= 0);--> statement-breakpoint
+ALTER TABLE "user_settings" ADD CONSTRAINT "settings_gross_nonneg" CHECK ("user_settings"."gross_salary_cents" >= 0);--> statement-breakpoint
+ALTER TABLE "user_settings" ADD CONSTRAINT "settings_statutory_nonneg" CHECK ("user_settings"."statutory_cents" >= 0);--> statement-breakpoint
+ALTER TABLE "user_settings" ADD CONSTRAINT "settings_net_nonneg" CHECK ("user_settings"."net_salary_cents" >= 0);

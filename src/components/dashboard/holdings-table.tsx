@@ -1,15 +1,46 @@
-import { Panel } from "./panel";
+import { ExpandablePanel } from "./expandable-panel";
 import { formatCents } from "@/lib/money";
+import { cn } from "@/lib/utils";
 import type { HoldingValue } from "@/server/queries/wealth";
 
-/** Portfolio positions with live market value in MYR. Sorted by value desc so
- *  the biggest positions lead. Day change coloured fern/terracotta. */
+/** Portfolio positions with live market value in MYR. Collapsed to a portfolio
+ *  value + day-change summary; expands in place to the full positions table.
+ *  Sorted by value desc so the biggest positions lead. */
 export function HoldingsTable({ holdings }: { holdings: HoldingValue[] }) {
   if (!holdings.length) return null;
   const rows = [...holdings].sort((a, b) => b.marketValueCents - a.marketValueCents);
+  const totalValue = rows.reduce((n, h) => n + h.marketValueCents, 0);
+  // Portfolio day change: value-weighted mean over positions that report one.
+  const weighted = rows.filter((h) => h.dayChgPct != null);
+  const weightedBase = weighted.reduce((n, h) => n + h.marketValueCents, 0);
+  const dayChgPct =
+    weightedBase > 0
+      ? weighted.reduce((n, h) => n + h.marketValueCents * (h.dayChgPct ?? 0), 0) / weightedBase
+      : null;
+  const chgPctDisplay = dayChgPct != null ? dayChgPct * 100 : null;
+
+  const summary = (
+    <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+      <span className="tabular font-display text-lg leading-none">{formatCents(totalValue)}</span>
+      <span className="text-sm text-muted-foreground">
+        {rows.length} position{rows.length === 1 ? "" : "s"}
+      </span>
+      {chgPctDisplay != null && (
+        <span
+          className={cn(
+            "tabular text-sm",
+            chgPctDisplay >= 0 ? "text-income" : "text-destructive",
+          )}
+        >
+          {chgPctDisplay >= 0 ? "+" : ""}
+          {chgPctDisplay.toFixed(2)}% today
+        </span>
+      )}
+    </div>
+  );
 
   return (
-    <Panel title="Portfolio">
+    <ExpandablePanel title="Portfolio" summary={summary}>
       <div className="-mx-2 overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -46,6 +77,6 @@ export function HoldingsTable({ holdings }: { holdings: HoldingValue[] }) {
           </tbody>
         </table>
       </div>
-    </Panel>
+    </ExpandablePanel>
   );
 }

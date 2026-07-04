@@ -25,11 +25,15 @@ const EXPENSE_FRAMEWORKS = ["Needs", "Wants", "Savings"] as const;
 
 /** Create/edit dialog. Legacy rule enforced in the UI too: framework mirrors
  *  type unless type is Expense, which splits into Needs/Wants/Savings. */
+const NEW_GROUP = "__new_group__";
+
 export function CategoryEditor({
   row, // null = closed, "new" = create, CategoryRow = edit
+  groups,
   onClose,
 }: {
   row: CategoryRow | "new" | null;
+  groups: string[];
   onClose: () => void;
 }) {
   const editing = row !== null && row !== "new" ? row : null;
@@ -42,6 +46,9 @@ export function CategoryEditor({
   const [budget, setBudget] = useState(
     editing && editing.monthlyBudgetCents > 0 ? formatAmount(editing.monthlyBudgetCents) : "",
   );
+  const [error, setError] = useState<string | null>(null);
+  // "New group…" reveals a free-text input; otherwise pick an existing group.
+  const [creatingGroup, setCreatingGroup] = useState(false);
 
   function handleType(t: CategoryInput["type"]) {
     setType(t);
@@ -53,6 +60,7 @@ export function CategoryEditor({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setError(null);
     const budgetCents = budget.trim() === "" ? 0 : toCents(budget);
     if (budgetCents == null || budgetCents < 0)
       return toast.error("Enter a valid budget amount");
@@ -71,7 +79,10 @@ export function CategoryEditor({
       if (res.ok) {
         toast.success(editing ? "Saved" : `"${input.name}" created`);
         onClose();
-      } else toast.error(res.error);
+      } else {
+        setError(res.error);
+        toast.error(res.error);
+      }
     });
   }
 
@@ -101,14 +112,50 @@ export function CategoryEditor({
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="cat-main">Main category</Label>
-            <Input
-              id="cat-main"
-              value={mainCategory}
-              onChange={(e) => setMainCategory(e.target.value)}
-              placeholder="e.g. Food & Dining"
-              autoComplete="off"
-            />
+            <Label htmlFor="cat-main">Main category (group)</Label>
+            {creatingGroup ? (
+              <div className="flex gap-2">
+                <Input
+                  id="cat-main"
+                  value={mainCategory}
+                  onChange={(e) => setMainCategory(e.target.value)}
+                  placeholder="New group name"
+                  autoFocus
+                  autoComplete="off"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setCreatingGroup(false);
+                    setMainCategory(editing?.mainCategory ?? "");
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <select
+                id="cat-main"
+                value={mainCategory}
+                onChange={(e) => {
+                  if (e.target.value === NEW_GROUP) {
+                    setCreatingGroup(true);
+                    setMainCategory("");
+                  } else setMainCategory(e.target.value);
+                }}
+                className="border-input bg-transparent h-9 w-full rounded-md border px-3 text-sm shadow-xs outline-none"
+              >
+                <option value="">None</option>
+                {groups.map((g) => (
+                  <option key={g} value={g}>
+                    {g}
+                  </option>
+                ))}
+                <option value={NEW_GROUP}>+ New group…</option>
+              </select>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -160,6 +207,7 @@ export function CategoryEditor({
               placeholder="0.00 — leave empty for no budget"
               autoComplete="off"
             />
+            {error && <p className="text-xs text-destructive">{error}</p>}
           </div>
 
           <Button type="submit" size="lg" disabled={pending} className="mt-1">

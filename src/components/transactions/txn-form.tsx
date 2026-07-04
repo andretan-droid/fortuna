@@ -26,7 +26,7 @@ export type CategoryOption = {
   type: "Income" | "Expense" | "Deduction" | "Transfer";
   framework: string;
 };
-export type SimpleOption = { id: string; name: string };
+export type SimpleOption = { id: string; name: string; kind?: string };
 export type BnplOption = {
   id: string;
   item: string;
@@ -47,13 +47,29 @@ function OptionCombobox({
 }: {
   value: string | null;
   onChange: (v: string | null) => void;
-  options: { value: string; label: string; hint?: string }[];
+  options: { value: string; label: string; hint?: string; group?: string }[];
   placeholder: string;
   allowClear?: boolean;
   id?: string;
 }) {
   const [open, setOpen] = useState(false);
   const selected = options.find((o) => o.value === value);
+
+  // Partition into labelled groups, preserving first-seen order. When no option
+  // carries a group, this collapses to a single unlabelled group (prior behaviour).
+  const grouped = useMemo(() => {
+    const order: string[] = [];
+    const byGroup = new Map<string, typeof options>();
+    for (const o of options) {
+      const g = o.group ?? "";
+      if (!byGroup.has(g)) {
+        byGroup.set(g, []);
+        order.push(g);
+      }
+      byGroup.get(g)!.push(o);
+    }
+    return order.map((g) => ({ heading: g, items: byGroup.get(g)! }));
+  }, [options]);
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -75,8 +91,8 @@ function OptionCombobox({
           <CommandInput placeholder="Search…" />
           <CommandList>
             <CommandEmpty>Nothing found.</CommandEmpty>
-            <CommandGroup>
-              {allowClear && selected && (
+            {allowClear && selected && (
+              <CommandGroup>
                 <CommandItem
                   value="__clear"
                   onSelect={() => {
@@ -87,29 +103,33 @@ function OptionCombobox({
                 >
                   Clear selection
                 </CommandItem>
-              )}
-              {options.map((o) => (
-                <CommandItem
-                  key={o.value}
-                  value={o.label}
-                  onSelect={() => {
-                    onChange(o.value);
-                    setOpen(false);
-                  }}
-                >
-                  <Check
-                    className={cn(
-                      "size-4",
-                      o.value === value ? "opacity-100" : "opacity-0",
+              </CommandGroup>
+            )}
+            {grouped.map((grp) => (
+              <CommandGroup key={grp.heading || "_"} heading={grp.heading || undefined}>
+                {grp.items.map((o) => (
+                  <CommandItem
+                    key={o.value}
+                    value={o.label}
+                    onSelect={() => {
+                      onChange(o.value);
+                      setOpen(false);
+                    }}
+                  >
+                    <Check
+                      className={cn(
+                        "size-4",
+                        o.value === value ? "opacity-100" : "opacity-0",
+                      )}
+                    />
+                    <span className="truncate">{o.label}</span>
+                    {o.hint && (
+                      <span className="ml-auto text-xs text-muted-foreground">{o.hint}</span>
                     )}
-                  />
-                  <span className="truncate">{o.label}</span>
-                  {o.hint && (
-                    <span className="ml-auto text-xs text-muted-foreground">{o.hint}</span>
-                  )}
-                </CommandItem>
-              ))}
-            </CommandGroup>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            ))}
           </CommandList>
         </Command>
       </PopoverContent>
@@ -206,7 +226,7 @@ export function TxnForm({
             id="txn-method"
             value={paymentMethodId}
             onChange={setPaymentMethodId}
-            options={paymentMethods.map((m) => ({ value: m.id, label: m.name }))}
+            options={paymentMethods.map((m) => ({ value: m.id, label: m.name, group: m.kind }))}
             placeholder="Optional"
             allowClear
           />

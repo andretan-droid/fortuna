@@ -17,9 +17,16 @@ import { cn } from "@/lib/utils";
 import { formatCents, toCents, formatAmount } from "@/lib/money";
 import { deleteRecurringRule, saveRecurringRule } from "@/server/actions/settings";
 import type { RecurringRuleRow } from "@/server/queries/settings";
+import type { RecurringStatusRow } from "@/server/queries/recurring";
 import { SettingsSection } from "./section";
 
 type Opt = { id: string; name: string };
+
+const STATUS_CHIP: Record<RecurringStatusRow["status"], { label: string; className: string }> = {
+  paid: { label: "Paid", className: "bg-income/15 text-income" },
+  due: { label: "Due", className: "bg-muted text-muted-foreground" },
+  missed: { label: "Missed", className: "bg-destructive/15 text-destructive" },
+};
 
 function RuleEditor({
   rule,
@@ -86,7 +93,8 @@ function RuleEditor({
             {editing ? "Edit recurring rule" : "New recurring rule"}
           </DialogTitle>
           <DialogDescription>
-            Expected monthly bills — the dashboard flags missed or off-amount ones.
+            Expected monthly bills, checked against this month&apos;s ledger. Missed or
+            still-due bills are flagged on the dashboard.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -164,19 +172,22 @@ export function RecurringManager({
   rows,
   categories,
   paymentMethods,
+  statuses = [],
 }: {
   rows: RecurringRuleRow[];
   categories: Opt[];
   paymentMethods: Opt[];
+  statuses?: RecurringStatusRow[];
 }) {
   const [editing, setEditing] = useState<RecurringRuleRow | "new" | null>(null);
   const [pending, startTransition] = useTransition();
   const catName = (id: string) => categories.find((c) => c.id === id)?.name ?? "?";
+  const statusById = new Map(statuses.map((s) => [s.id, s.status]));
 
   return (
     <SettingsSection
       title="Recurring rules"
-      description="Known monthly bills, checked against the ledger."
+      description="Known monthly bills, checked against this month's ledger."
     >
       <div className="mb-3 flex justify-end">
         <Button size="sm" onClick={() => setEditing("new")}>
@@ -204,6 +215,21 @@ export function RecurringManager({
                 {r.day != null && ` · day ${r.day}`}
               </span>
             </button>
+            {r.active &&
+              statusById.has(r.id) &&
+              (() => {
+                const chip = STATUS_CHIP[statusById.get(r.id)!];
+                return (
+                  <span
+                    className={cn(
+                      "rounded-full px-2 py-0.5 text-xs font-medium",
+                      chip.className,
+                    )}
+                  >
+                    {chip.label}
+                  </span>
+                );
+              })()}
             <Button
               variant="ghost"
               size="sm"

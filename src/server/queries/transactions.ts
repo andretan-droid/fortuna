@@ -182,10 +182,10 @@ export async function getCategoryOptions(userId: string) {
 export async function getPaymentMethodOptions(userId: string) {
   const db = getDb();
   return db
-    .select({ id: paymentMethods.id, name: paymentMethods.name })
+    .select({ id: paymentMethods.id, name: paymentMethods.name, kind: paymentMethods.kind })
     .from(paymentMethods)
     .where(and(eq(paymentMethods.userId, userId), eq(paymentMethods.active, true)))
-    .orderBy(paymentMethods.name);
+    .orderBy(paymentMethods.kind, paymentMethods.name);
 }
 
 export async function getBnplPlanOptions(userId: string) {

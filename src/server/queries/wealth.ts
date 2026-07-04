@@ -8,6 +8,9 @@ import {
   netWorthEntries,
   userSettings,
 } from "@/db/schema";
+import { bnplState } from "@/lib/bnpl";
+import { monthKey, todayISO } from "@/lib/dates";
+import { fetchBnplInputs } from "@/server/queries/debts";
 
 /* Wealth read layer — net worth (manual account balances) + live portfolio
  * (holdings × price × FX). Kept separate from the ledger queries because this
@@ -43,7 +46,8 @@ export type WealthSummary = {
   accounts: AccountBalance[];
   assetsCents: number; // Σ latest asset balances
   liabilitiesCents: number; // Σ latest liability balances (stored positive)
-  accountsNetCents: number; // assets − liabilities
+  accountsNetCents: number; // (assets − account liabilities − BNPL outstanding)
+  bnplOutstandingCents: number; // Σ active-plan outstanding, folded into liabilities
   holdings: HoldingValue[];
   portfolioValueCents: number; // Σ live holding market values (MYR)
   netWorthCents: number; // accountsNetCents + portfolioValueCents
@@ -54,7 +58,7 @@ export type WealthSummary = {
 export async function getWealthSummary(userId: string): Promise<WealthSummary> {
   const db = getDb();
 
-  const [acctRows, nweRows, holdingRows, fxRows, settingsRows] = await Promise.all([
+  const [acctRows, nweRows, holdingRows, fxRows, settingsRows, bnplInputs] = await Promise.all([
     db
       .select()
       .from(accounts)
@@ -75,6 +79,7 @@ export async function getWealthSummary(userId: string): Promise<WealthSummary> {
     db.select().from(holdings).where(eq(holdings.userId, userId)).orderBy(asc(holdings.ticker)),
     db.select().from(fxRates).where(eq(fxRates.userId, userId)),
     db.select({ pricesUpdatedAt: userSettings.pricesUpdatedAt }).from(userSettings).where(eq(userSettings.userId, userId)),
+    fetchBnplInputs(db, userId),
   ]);
 
   // asc(month) → the last write for each account wins = its latest balance.
@@ -100,6 +105,14 @@ export async function getWealthSummary(userId: string): Promise<WealthSummary> {
     if (a.kind === "Asset") assetsCents += a.balanceCents;
     else liabilitiesCents += a.balanceCents;
   }
+  // BNPL outstanding is a liability the account list doesn't capture (legacy
+  // calc.js:259-260). Fold it in BEFORE netting so net worth drops by exactly it.
+  const bnplOutstandingCents = bnplState(
+    bnplInputs.plans,
+    bnplInputs.txns,
+    monthKey(todayISO()),
+  ).totalOutstandingCents;
+  liabilitiesCents += bnplOutstandingCents;
   const accountsNetCents = assetsCents - liabilitiesCents;
 
   // FX map: 'USDMYR' → rate. rateLive is authoritative; fallback until refreshed.
@@ -134,6 +147,7 @@ export async function getWealthSummary(userId: string): Promise<WealthSummary> {
     assetsCents,
     liabilitiesCents,
     accountsNetCents,
+    bnplOutstandingCents,
     holdings: holdingValues,
     portfolioValueCents,
     netWorthCents: accountsNetCents + portfolioValueCents,

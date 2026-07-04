@@ -9,12 +9,14 @@ import { SinkingManager } from "@/components/settings/sinking-manager";
 import { requireUserId } from "@/server/auth-helpers";
 import { getCategoryOptions } from "@/server/queries/transactions";
 import { getSettingsBundle } from "@/server/queries/settings";
+import { getRecurringStatus } from "@/server/queries/recurring";
 
 export default async function SettingsPage() {
   const userId = await requireUserId();
-  const [bundle, categoryOptions] = await Promise.all([
+  const [bundle, categoryOptions, recurringStatus] = await Promise.all([
     getSettingsBundle(userId),
     getCategoryOptions(userId),
+    getRecurringStatus(userId),
   ]);
 
   return (
@@ -36,6 +38,7 @@ export default async function SettingsPage() {
           paymentMethods={bundle.paymentMethods
             .filter((m) => m.active)
             .map((m) => ({ id: m.id, name: m.name }))}
+          statuses={recurringStatus}
         />
       </div>
       <DangerZone />

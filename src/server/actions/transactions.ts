@@ -58,6 +58,9 @@ async function verifyRefs(
 function revalidate() {
   revalidatePath("/transactions");
   revalidatePath("/dashboard");
+  revalidatePath("/analytics");
+  revalidatePath("/categories");
+  revalidatePath("/debts");
 }
 
 export async function createTransaction(raw: unknown): Promise<ActionResult> {

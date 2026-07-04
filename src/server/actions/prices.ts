@@ -102,7 +102,13 @@ export async function refreshPrices(): Promise<ActionResult> {
     db.update(userSettings).set({ pricesUpdatedAt: now }).where(eq(userSettings.userId, userId)),
   );
 
-  await db.batch(writes as [BatchItem<"pg">, ...BatchItem<"pg">[]]);
+  try {
+    await db.batch(writes as [BatchItem<"pg">, ...BatchItem<"pg">[]]);
+  } catch (err) {
+    // db.batch throwing must travel as data — actions never throw.
+    const msg = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: `Price refresh failed: ${msg}` };
+  }
   revalidatePath("/dashboard");
   return { ok: true, id: userId };
 }

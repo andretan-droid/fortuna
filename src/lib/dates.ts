@@ -47,4 +47,14 @@ export function formatMonthLong(month: string): string {
   });
 }
 
+/** 'YYYY-MM' + n months → 'YYYY-MM' (n may be negative). Pure integer math,
+ *  no Date — mirrors legacy calc.js addMonths but avoids timezone drift. */
+export function addMonths(month: string, n: number): string {
+  const [y, m] = month.split("-").map(Number);
+  const total = y * 12 + (m - 1) + n;
+  const ny = Math.floor(total / 12);
+  const nm = total - ny * 12; // always 0..11 (Math.floor rounds toward -∞)
+  return `${ny}-${String(nm + 1).padStart(2, "0")}`;
+}
+
 export const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
