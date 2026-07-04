@@ -63,16 +63,16 @@ export default async function DashboardPage() {
             </Reveal>
           )}
 
-          <Reveal index={2}>
+          <Reveal index={3}>
             <WealthCard wealth={wealth} />
           </Reveal>
 
-          <Reveal className="grid gap-4 lg:grid-cols-2" index={3}>
+          <Reveal className="grid gap-4 lg:grid-cols-2" index={4}>
             <RecentActivity rows={summary.recentActivity} />
             <HoldingsTable holdings={wealth.holdings} />
           </Reveal>
 
-          <Reveal className="grid gap-4 lg:grid-cols-2" index={4}>
+          <Reveal className="grid gap-4 lg:grid-cols-2" index={5}>
             <SinkingFunds funds={summary.sinkingFunds} />
             <AccountCards accounts={wealth.accounts} />
           </Reveal>

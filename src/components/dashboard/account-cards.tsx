@@ -11,23 +11,43 @@ export function AccountCards({ accounts }: { accounts: AccountBalance[] }) {
   const liabilities = accounts.filter((a) => a.kind === "Liability");
   const sum = (rows: AccountBalance[]) => rows.reduce((n, a) => n + (a.balanceCents ?? 0), 0);
 
+  // Top-5 preview (by balance) fills the collapsed card next to SinkingFunds;
+  // group-open:hidden drops it on expand so the editable list below isn't duplicated.
+  const top = [...accounts]
+    .sort((a, b) => (b.balanceCents ?? 0) - (a.balanceCents ?? 0))
+    .slice(0, 5);
   const summary = (
-    <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-      <span className="text-sm text-muted-foreground">
-        {accounts.length} account{accounts.length === 1 ? "" : "s"}
-      </span>
-      {assets.length > 0 && (
-        <span className="tabular text-sm">
-          <span className="text-muted-foreground">Assets </span>
-          {formatCents(sum(assets))}
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+        <span className="text-sm text-muted-foreground">
+          {accounts.length} account{accounts.length === 1 ? "" : "s"}
         </span>
-      )}
-      {liabilities.length > 0 && (
-        <span className="tabular text-sm">
-          <span className="text-muted-foreground">Liabilities </span>
-          {formatCents(sum(liabilities))}
-        </span>
-      )}
+        {assets.length > 0 && (
+          <span className="tabular text-sm">
+            <span className="text-muted-foreground">Assets </span>
+            {formatCents(sum(assets))}
+          </span>
+        )}
+        {liabilities.length > 0 && (
+          <span className="tabular text-sm">
+            <span className="text-muted-foreground">Liabilities </span>
+            {formatCents(sum(liabilities))}
+          </span>
+        )}
+      </div>
+      <ul className="space-y-1.5 group-open:hidden">
+        {top.map((a) => (
+          <li key={a.id} className="flex items-baseline justify-between gap-3 text-sm">
+            <span className="truncate font-medium">{a.name}</span>
+            <span className="tabular shrink-0 text-muted-foreground">
+              {a.balanceCents != null ? formatCents(a.balanceCents) : "Not set"}
+            </span>
+          </li>
+        ))}
+        {accounts.length > top.length && (
+          <li className="pt-0.5 text-xs text-muted-foreground">Show all {accounts.length} accounts</li>
+        )}
+      </ul>
     </div>
   );
 

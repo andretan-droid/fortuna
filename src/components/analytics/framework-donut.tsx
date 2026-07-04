@@ -44,9 +44,11 @@ export function FrameworkDonut({
   });
 
   return (
-    <Panel title={`Framework split — ${monthLabel}`}>
-      <ChartTipSurface>
-        <div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
+    <Panel title={`Framework split — ${monthLabel}`} className="flex flex-col">
+      {/* flex-1 + centering so the donut sits mid-card when grid-stretched next to
+          the taller Spending list, instead of leaving the bottom half empty. */}
+      <ChartTipSurface className="flex flex-1 flex-col justify-center">
+        <div className="flex flex-col items-center gap-5 sm:flex-row sm:gap-6">
           <div className="relative shrink-0">
             <svg viewBox="0 0 160 160" className="size-36 -rotate-90" role="img" aria-label="Framework split">
               {segments.map((s) => {
@@ -63,13 +65,22 @@ export function FrameworkDonut({
             </div>
           </div>
 
-          <ul className="flex-1 space-y-2 text-sm">
+          <ul className="flex-1 space-y-3 text-sm">
             {segments.map((s) => (
-              <li key={s.framework} className="flex items-center gap-2">
-                <span className="size-2.5 shrink-0 rounded-full" style={{ background: COLOR[s.framework] }} />
-                <span className="flex-1">{s.framework}</span>
-                <span className="tabular text-muted-foreground">{Math.round(s.pct)}%</span>
-                <span className="tabular w-24 text-right">{formatCents(s.spentCents)}</span>
+              <li key={s.framework} className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="size-2.5 shrink-0 rounded-full" style={{ background: COLOR[s.framework] }} />
+                  <span className="flex-1">{s.framework}</span>
+                  <span className="tabular text-muted-foreground">{Math.round(s.pct)}%</span>
+                  <span className="tabular w-24 text-right">{formatCents(s.spentCents)}</span>
+                </div>
+                {/* Share bar mirrors the neighbouring Spending card's bars. */}
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full"
+                    style={{ width: `${s.pct}%`, background: COLOR[s.framework] }}
+                  />
+                </div>
               </li>
             ))}
           </ul>

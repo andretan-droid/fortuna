@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/shell/page-header";
+import { Reveal } from "@/components/motion/reveal";
 import { AccountsManager } from "@/components/settings/accounts-manager";
 import { DangerZone } from "@/components/settings/danger-zone";
 import { PaymentMethods } from "@/components/settings/payment-methods";
@@ -26,7 +27,7 @@ export default async function SettingsPage() {
         title="Settings"
         description="Profile, price feed, payment methods, accounts, and danger zone."
       />
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+      <Reveal className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <ProfileForm profile={bundle.profile} paymentMethods={bundle.paymentMethods} />
         <PriceFeedForm profile={bundle.profile} />
         <PaymentMethods rows={bundle.paymentMethods} />
@@ -40,8 +41,10 @@ export default async function SettingsPage() {
             .map((m) => ({ id: m.id, name: m.name }))}
           statuses={recurringStatus}
         />
-      </div>
-      <DangerZone />
+      </Reveal>
+      <Reveal index={1}>
+        <DangerZone />
+      </Reveal>
     </div>
   );
 }

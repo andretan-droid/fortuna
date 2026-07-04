@@ -65,7 +65,7 @@ export default async function AnalyticsPage({
       ) : (
         <>
           <div className="flex items-center justify-between gap-2">
-            <h2 className="font-display text-sm uppercase tracking-[0.16em] text-muted-foreground">
+            <h2 className="font-display text-xs uppercase tracking-[0.16em] text-muted-foreground">
               Trends
             </h2>
             <RangePicker selected={range} />
@@ -81,7 +81,7 @@ export default async function AnalyticsPage({
           </Reveal>
 
           <div className="glass sticky top-16 z-10 -mx-2 flex items-center justify-between gap-2 rounded-lg px-4 py-2.5">
-            <h2 className="font-display text-sm uppercase tracking-[0.16em] text-muted-foreground">
+            <h2 className="font-display text-xs uppercase tracking-[0.16em] text-muted-foreground">
               This month
             </h2>
             <MonthPicker months={a.months} selected={a.selectedMonth} />

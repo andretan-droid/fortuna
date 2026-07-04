@@ -6,7 +6,7 @@ import { NAV_ITEMS } from "./nav";
 import { cn } from "@/lib/utils";
 
 /** Mobile bottom navigation (<1024px). Frosted glass over the grain. Short
- *  labels keep all six tabs legible at 375px. */
+ *  labels keep all seven tabs legible at 375px. */
 export function BottomTabs() {
   const pathname = usePathname();
 
@@ -25,7 +25,7 @@ export function BottomTabs() {
             )}
           >
             <Icon className="size-5" strokeWidth={active ? 2 : 1.75} />
-            <span className="text-[10px] tracking-tight">{short}</span>
+            <span className="whitespace-nowrap text-[10px] tracking-tight">{short}</span>
           </Link>
         );
       })}

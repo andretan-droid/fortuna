@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/shell/page-header";
+import { Reveal } from "@/components/motion/reveal";
 import { ImportWizard } from "@/components/import/wizard";
 
 export default function ImportPage() {
@@ -9,7 +10,9 @@ export default function ImportPage() {
         title="Import your data"
         description="Bring in an existing budget from a spreadsheet — the template's tabs and columns map straight in, validated before anything is written."
       />
-      <ImportWizard />
+      <Reveal>
+        <ImportWizard />
+      </Reveal>
     </div>
   );
 }

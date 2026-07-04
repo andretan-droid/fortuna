@@ -26,7 +26,7 @@ export function ExpandablePanel({
         className,
       )}
     >
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-6">
+      <summary className="flex cursor-pointer list-none items-start justify-between gap-4 p-6">
         <div className="min-w-0">
           {title && (
             <h2 className="font-display text-xs uppercase tracking-[0.16em] text-muted-foreground">
