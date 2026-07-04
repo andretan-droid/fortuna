@@ -111,7 +111,7 @@ export function BatchAdd({
         </Button>
       </SheetTrigger>
       <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-3xl">
-        <SheetHeader>
+        <SheetHeader className="pr-10">
           <SheetTitle className="font-display text-2xl">Batch add transactions</SheetTitle>
           <SheetDescription>
             Paste rows (date ⇥ amount ⇥ description ⇥ category ⇥ method) or type into the
@@ -137,7 +137,7 @@ export function BatchAdd({
 
           {/* Editable grid */}
           <div className="overflow-x-auto rounded-lg border border-border">
-            <table className="w-full border-collapse text-sm">
+            <table className="w-full min-w-[720px] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
                   <th className="p-2 font-medium">Date</th>

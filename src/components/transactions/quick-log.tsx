@@ -48,7 +48,7 @@ export function QuickLog({
         </Button>
       </SheetTrigger>
       <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md">
-        <SheetHeader>
+        <SheetHeader className="pr-10">
           <SheetTitle className="font-display text-2xl">Quick log</SheetTitle>
           <SheetDescription>Amount first — everything else is two taps.</SheetDescription>
         </SheetHeader>

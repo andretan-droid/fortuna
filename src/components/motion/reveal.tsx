@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { motion, useMotionValue, useSpring, useReducedMotion } from "motion/react";
-import { fadeRise, staggerContainer } from "@/lib/motion";
+import { motion, useReducedMotion } from "motion/react";
+import { fadeRise, staggerContainer, EASE_REVEAL } from "@/lib/motion";
 
 /** Fires once when scrolled into view (not on mount) so content below the fold
  *  animates as you reach it. `index` is the element's order down the page — it
@@ -27,7 +26,7 @@ export function Reveal({
       custom={index}
       initial="hidden"
       whileInView="show"
-      viewport={{ once: true, amount: 0.25, margin: "0px 0px -8% 0px" }}
+      viewport={{ once: true, amount: "some", margin: "0px 0px -8% 0px" }}
     >
       {children}
     </motion.div>
@@ -53,15 +52,15 @@ export function StaggerGroup({
       variants={staggerContainer}
       initial="hidden"
       whileInView="show"
-      viewport={{ once: true, amount: 0.2, margin: "0px 0px -8% 0px" }}
+      viewport={{ once: true, amount: "some", margin: "0px 0px -8% 0px" }}
     >
       {children}
     </motion.div>
   );
 }
 
-/** Spring count-up for hero numerals. Reduced-motion → final value rendered
- *  immediately. Writes textContent via ref so the span keeps tabular width. */
+/** Hero numeral: renders the final value and gently fades in — no count-up.
+ *  Reduced-motion → plain span, no animation. */
 export function AnimatedNumber({
   value,
   format,
@@ -73,24 +72,15 @@ export function AnimatedNumber({
 }) {
   const reduce = useReducedMotion();
   const fmt = format ?? ((n: number) => Math.round(n).toLocaleString());
-  const ref = useRef<HTMLSpanElement>(null);
-  const mv = useMotionValue(0);
-  const spring = useSpring(mv, { stiffness: 90, damping: 20, mass: 1 });
-
-  useEffect(() => {
-    if (reduce) return;
-    mv.set(value);
-    const unsub = spring.on("change", (v) => {
-      if (ref.current) ref.current.textContent = fmt(v);
-    });
-    return unsub;
-    // fmt/mv/spring are stable enough; re-run only on value/reduce change.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value, reduce]);
-
+  if (reduce) return <span className={className}>{fmt(value)}</span>;
   return (
-    <span ref={ref} className={className}>
-      {fmt(reduce ? value : 0)}
-    </span>
+    <motion.span
+      className={className}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.4, ease: EASE_REVEAL }}
+    >
+      {fmt(value)}
+    </motion.span>
   );
 }
