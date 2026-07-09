@@ -27,7 +27,9 @@ import {
 import type { CategoryOption, SimpleOption } from "./txn-form";
 
 const selectClass =
-  "border-input bg-transparent h-8 w-full min-w-28 rounded-md border px-2 text-sm outline-none focus:ring-2 focus:ring-ring";
+  // text-base on mobile (≥16px) stops iOS Safari auto-zooming the page on tap;
+  // md:text-sm keeps the compact desktop size (mirrors ui/input.tsx).
+  "border-input bg-transparent h-8 w-full min-w-28 rounded-md border px-2 text-base md:text-sm outline-none focus:ring-2 focus:ring-ring";
 
 /** "Batch add" button + full-height sheet: paste rows from Excel/Notes into the
  *  box, or type straight into the grid. Every row validates live; bad rows are
@@ -128,7 +130,8 @@ export function BatchAdd({
               aria-label="Paste transactions"
               rows={4}
               placeholder={"2026-07-01\t12.50\tNasi lemak\tFood\tCash\n2026-07-01\t6.00\tKopi\tFood\tCash"}
-              className="w-full resize-y rounded-md border border-input bg-transparent p-3 font-mono text-xs outline-none focus:ring-2 focus:ring-ring"
+              // text-base on mobile stops iOS auto-zoom on focus; md:text-xs keeps the compact paste look on desktop.
+              className="w-full resize-y rounded-md border border-input bg-transparent p-3 font-mono text-base outline-none focus:ring-2 focus:ring-ring md:text-xs"
             />
             <Button type="button" variant="secondary" size="sm" onClick={handleParse}>
               <ClipboardPaste className="size-4" /> Parse into grid
