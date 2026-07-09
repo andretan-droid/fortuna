@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { type ReactNode, useMemo, useState, useTransition } from "react";
 import { Plus, Trash2, ClipboardPaste } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -138,111 +138,112 @@ export function BatchAdd({
             </Button>
           </div>
 
-          {/* Editable grid */}
-          <div className="overflow-x-auto rounded-lg border border-border">
-            <table className="w-full min-w-[720px] border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
-                  <th className="p-2 font-medium">Date</th>
-                  <th className="p-2 font-medium">Amount</th>
-                  <th className="p-2 font-medium">Description</th>
-                  <th className="p-2 font-medium">Category</th>
-                  <th className="p-2 font-medium">Method</th>
-                  <th className="w-8 p-2" />
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r, i) => {
-                  const v = validated[i];
-                  const bad = v.errors.length > 0 && !isPristine(r);
-                  return (
-                    <tr
-                      key={i}
-                      className={cn("border-b border-border/60 align-top", bad && "bg-destructive/5")}
+          {/* Editable grid — a fixed-width table overflowed the phone sheet, hiding
+           *  Category/Method off-screen. So: stacked labelled cards on mobile (every
+           *  field full-width and reachable), and the horizontal table-style row on
+           *  ≥sm where the sheet (and landscape) are wide enough. */}
+          <div className="rounded-lg border border-border">
+            {/* Column headers only apply to the ≥sm horizontal row layout. */}
+            <div className="hidden border-b border-border px-1.5 py-2 text-xs uppercase tracking-wider text-muted-foreground sm:flex sm:gap-2">
+              <div className="w-36 px-1">Date</div>
+              <div className="w-24 px-1">Amount</div>
+              <div className="flex-1 px-1">Description</div>
+              <div className="w-36 px-1">Category</div>
+              <div className="w-32 px-1">Method</div>
+              <div className="w-6" />
+            </div>
+            {rows.map((r, i) => {
+              const v = validated[i];
+              const bad = v.errors.length > 0 && !isPristine(r);
+              return (
+                <div
+                  key={i}
+                  className={cn(
+                    "flex flex-col gap-2 border-b border-border/60 p-3 last:border-b-0",
+                    "sm:flex-row sm:items-start sm:gap-2 sm:p-1.5",
+                    bad && "bg-destructive/5",
+                  )}
+                >
+                  <GridField label="Date" className="sm:w-36">
+                    <Input
+                      type="date"
+                      value={r.date}
+                      onChange={(e) => setCell(i, "date", e.target.value)}
+                      className="h-9 w-full sm:h-8"
+                      aria-label={`Row ${i + 1} date`}
+                    />
+                  </GridField>
+                  <GridField label="Amount" className="sm:w-24">
+                    <Input
+                      value={r.amount}
+                      onChange={(e) => setCell(i, "amount", e.target.value)}
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      className="tabular h-9 w-full text-right sm:h-8"
+                      aria-label={`Row ${i + 1} amount`}
+                    />
+                  </GridField>
+                  <GridField label="Description" className="sm:flex-1">
+                    <Input
+                      value={r.description}
+                      onChange={(e) => setCell(i, "description", e.target.value)}
+                      placeholder="Optional"
+                      className="h-9 w-full sm:h-8"
+                      aria-label={`Row ${i + 1} description`}
+                    />
+                  </GridField>
+                  <GridField label="Category" className="sm:w-36">
+                    <select
+                      value={v.categoryId ?? ""}
+                      onChange={(e) => {
+                        const cat = categories.find((c) => c.id === e.target.value);
+                        setCell(i, "category", cat?.name ?? "");
+                      }}
+                      className={cn(selectClass, !v.categoryId && "text-muted-foreground")}
+                      aria-label={`Row ${i + 1} category`}
                     >
-                      <td className="p-1.5">
-                        <Input
-                          type="date"
-                          value={r.date}
-                          onChange={(e) => setCell(i, "date", e.target.value)}
-                          className="h-8 min-w-36"
-                          aria-label={`Row ${i + 1} date`}
-                        />
-                      </td>
-                      <td className="p-1.5">
-                        <Input
-                          value={r.amount}
-                          onChange={(e) => setCell(i, "amount", e.target.value)}
-                          inputMode="decimal"
-                          placeholder="0.00"
-                          className="tabular h-8 w-24 text-right"
-                          aria-label={`Row ${i + 1} amount`}
-                        />
-                      </td>
-                      <td className="p-1.5">
-                        <Input
-                          value={r.description}
-                          onChange={(e) => setCell(i, "description", e.target.value)}
-                          placeholder="Optional"
-                          className="h-8 min-w-40"
-                          aria-label={`Row ${i + 1} description`}
-                        />
-                      </td>
-                      <td className="p-1.5">
-                        <select
-                          value={v.categoryId ?? ""}
-                          onChange={(e) => {
-                            const cat = categories.find((c) => c.id === e.target.value);
-                            setCell(i, "category", cat?.name ?? "");
-                          }}
-                          className={cn(selectClass, !v.categoryId && "text-muted-foreground")}
-                          aria-label={`Row ${i + 1} category`}
-                        >
-                          <option value="">
-                            {r.category && !v.categoryId ? `? ${r.category}` : "Pick…"}
-                          </option>
-                          {categories.map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.name}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="p-1.5">
-                        <select
-                          value={v.paymentMethodId ?? ""}
-                          onChange={(e) => {
-                            const m = paymentMethods.find((p) => p.id === e.target.value);
-                            setCell(i, "method", m?.name ?? "");
-                          }}
-                          className={cn(selectClass, !v.paymentMethodId && "text-muted-foreground")}
-                          aria-label={`Row ${i + 1} payment method`}
-                        >
-                          <option value="">
-                            {r.method && !v.paymentMethodId ? `? ${r.method}` : "None"}
-                          </option>
-                          {paymentMethods.map((m) => (
-                            <option key={m.id} value={m.id}>
-                              {m.name}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="p-1.5">
-                        <button
-                          type="button"
-                          onClick={() => removeRow(i)}
-                          aria-label={`Remove row ${i + 1}`}
-                          className="text-muted-foreground hover:text-destructive"
-                        >
-                          <Trash2 className="size-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      <option value="">
+                        {r.category && !v.categoryId ? `? ${r.category}` : "Pick…"}
+                      </option>
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </GridField>
+                  <GridField label="Method" className="sm:w-32">
+                    <select
+                      value={v.paymentMethodId ?? ""}
+                      onChange={(e) => {
+                        const m = paymentMethods.find((p) => p.id === e.target.value);
+                        setCell(i, "method", m?.name ?? "");
+                      }}
+                      className={cn(selectClass, !v.paymentMethodId && "text-muted-foreground")}
+                      aria-label={`Row ${i + 1} payment method`}
+                    >
+                      <option value="">
+                        {r.method && !v.paymentMethodId ? `? ${r.method}` : "None"}
+                      </option>
+                      {paymentMethods.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name}
+                        </option>
+                      ))}
+                    </select>
+                  </GridField>
+                  <button
+                    type="button"
+                    onClick={() => removeRow(i)}
+                    aria-label={`Remove row ${i + 1}`}
+                    className="flex items-center gap-1 self-end text-sm text-muted-foreground hover:text-destructive sm:w-6 sm:self-auto sm:pt-2"
+                  >
+                    <Trash2 className="size-4" />
+                    <span className="sm:hidden">Remove row</span>
+                  </button>
+                </div>
+              );
+            })}
           </div>
 
           {/* Row-level error reasons (only for non-pristine rows) */}
@@ -269,6 +270,28 @@ export function BatchAdd({
         </div>
       </SheetContent>
     </Sheet>
+  );
+}
+
+/** One field of a batch row. On mobile the row is a stacked card, so each field
+ *  shows its own label above a full-width control; on ≥sm the label is hidden and
+ *  the header row labels the columns instead. */
+function GridField({
+  label,
+  className,
+  children,
+}: {
+  label: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <label className={cn("block", className)}>
+      <span className="mb-1 block text-xs uppercase tracking-wider text-muted-foreground sm:hidden">
+        {label}
+      </span>
+      {children}
+    </label>
   );
 }
 
