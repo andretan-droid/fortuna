@@ -2,6 +2,7 @@ import { PageHeader } from "@/components/shell/page-header";
 import { Reveal } from "@/components/motion/reveal";
 import { AccountsManager } from "@/components/settings/accounts-manager";
 import { DangerZone } from "@/components/settings/danger-zone";
+import { ExportData } from "@/components/settings/export-data";
 import { PaymentMethods } from "@/components/settings/payment-methods";
 import { PriceFeedForm } from "@/components/settings/price-feed-form";
 import { ProfileForm } from "@/components/settings/profile-form";
@@ -43,6 +44,9 @@ export default async function SettingsPage() {
         />
       </Reveal>
       <Reveal index={1}>
+        <ExportData />
+      </Reveal>
+      <Reveal index={2}>
         <DangerZone />
       </Reveal>
     </div>
