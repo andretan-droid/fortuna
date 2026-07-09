@@ -1,0 +1,49 @@
+name: CI
+
+# Tripwire on every push/PR to main. Vercel still deploys on push regardless —
+# this is a loud red X + notification when a commit breaks type-check, build, or
+# the DB-free self-checks, so a broken commit doesn't sit silently on prod.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install deps
+        run: npm ci
+
+      # Build + type-check must stay green with NO env vars — getDb() is a lazy
+      # singleton so next build never reads DATABASE_URL. Do NOT add secrets here.
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+
+      # DB-free self-checks only. Excluded (they hit Neon): verify-analytics,
+      # verify-dashboard, verify-import-e2e, seed-legacy, sync-bnpl, preflight-nonneg.
+      - name: Self-check — batch parser
+        run: npx tsx src/lib/batch-parse.ts
+
+      - name: Self-check — solar theme
+        run: npx tsx src/lib/solar.ts
+
+      - name: Self-check — chart math
+        run: npx tsx src/lib/chart.ts
+
+      - name: Self-check — import template round-trip
+        run: npx tsx scripts/verify-import.ts
+
+      - name: Self-check — export workbook builder
+        run: npx tsx scripts/verify-export-xlsx.ts
