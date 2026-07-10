@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, desc, ilike, inArray, sql, count } from "drizzle-orm";
+import { and, eq, desc, ilike, inArray, isNotNull, sql, count } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import {
   transactions,
@@ -7,6 +7,7 @@ import {
   paymentMethods,
   bnplPlans,
 } from "@/db/schema";
+import { instalmentAtCents } from "@/lib/bnpl";
 
 export const FEED_PAGE_SIZE = 50;
 
@@ -36,6 +37,7 @@ export type FeedRow = {
   framework: string;
   paymentMethodId: string | null;
   paymentMethod: string | null;
+  paymentMethodKind: string | null;
   bnplPlanId: string | null;
   bnpl: {
     item: string;
@@ -84,6 +86,7 @@ export async function getTransactionsPage(
       framework: categories.framework,
       paymentMethodId: transactions.paymentMethodId,
       paymentMethod: paymentMethods.name,
+      paymentMethodKind: paymentMethods.kind,
       bnplPlanId: transactions.bnplPlanId,
       deleted: transactions.deleted,
       createdAt: transactions.createdAt,
@@ -188,17 +191,94 @@ export async function getPaymentMethodOptions(userId: string) {
     .orderBy(paymentMethods.kind, paymentMethods.name);
 }
 
+/** Plans still owed on (paid < n) — completed plans stay linkable on their
+ *  OWN past transactions (TxnEditor merges those back in) but drop out of the
+ *  "pick a plan" combobox so you can't log a 4th instalment on a 3× plan. */
 export async function getBnplPlanOptions(userId: string) {
   const db = getDb();
-  return db
+  const [plans, counts] = await Promise.all([
+    db
+      .select({
+        id: bnplPlans.id,
+        item: bnplPlans.item,
+        platform: bnplPlans.platform,
+        categoryId: bnplPlans.categoryId,
+        paymentMethodId: bnplPlans.paymentMethodId,
+        totalAmountCents: bnplPlans.totalAmountCents,
+        nInstalments: bnplPlans.nInstalments,
+        instalmentCents: bnplPlans.instalmentCents,
+      })
+      .from(bnplPlans)
+      .where(eq(bnplPlans.userId, userId))
+      .orderBy(bnplPlans.item),
+    db
+      .select({ planId: transactions.bnplPlanId, n: count() })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.userId, userId),
+          eq(transactions.type, "Expense"),
+          eq(transactions.deleted, false),
+          isNotNull(transactions.bnplPlanId),
+        ),
+      )
+      .groupBy(transactions.bnplPlanId),
+  ]);
+  const paidById = new Map(counts.map((c) => [c.planId, c.n]));
+
+  return plans
+    .filter((p) => (paidById.get(p.id) ?? 0) < (p.nInstalments || 1))
+    .map((p) => {
+      const paid = Math.min(paidById.get(p.id) ?? 0, p.nInstalments || 1);
+      return {
+        id: p.id,
+        item: p.item,
+        platform: p.platform,
+        categoryId: p.categoryId,
+        paymentMethodId: p.paymentMethodId,
+        nInstalments: p.nInstalments,
+        instalmentCents: p.instalmentCents,
+        nextInstalmentCents: instalmentAtCents(p, paid + 1),
+      };
+    });
+}
+
+export type RecentDescription = {
+  description: string;
+  categoryId: string;
+  paymentMethodId: string | null;
+};
+
+/** Top ~30 distinct recent descriptions (most-recent use first), each with
+ *  the category/method it was last logged under — feeds the quick-log
+ *  description datalist and its "pick a recent merchant → prefill" shortcut. */
+export async function getRecentDescriptions(userId: string): Promise<RecentDescription[]> {
+  const db = getDb();
+  const rows = await db
     .select({
-      id: bnplPlans.id,
-      item: bnplPlans.item,
-      platform: bnplPlans.platform,
-      nInstalments: bnplPlans.nInstalments,
-      instalmentCents: bnplPlans.instalmentCents,
+      description: transactions.description,
+      categoryId: transactions.categoryId,
+      paymentMethodId: transactions.paymentMethodId,
     })
-    .from(bnplPlans)
-    .where(eq(bnplPlans.userId, userId))
-    .orderBy(bnplPlans.item);
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.userId, userId),
+        eq(transactions.deleted, false),
+        isNotNull(transactions.description),
+      ),
+    )
+    .orderBy(desc(transactions.date), desc(transactions.createdAt))
+    .limit(150);
+
+  const seen = new Set<string>();
+  const out: RecentDescription[] = [];
+  for (const r of rows) {
+    const description = r.description?.trim();
+    if (!description || seen.has(description)) continue;
+    seen.add(description);
+    out.push({ description, categoryId: r.categoryId, paymentMethodId: r.paymentMethodId });
+    if (out.length >= 30) break;
+  }
+  return out;
 }

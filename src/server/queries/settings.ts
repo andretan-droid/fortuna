@@ -20,6 +20,16 @@ export async function getNetSalaryCents(userId: string): Promise<number | null> 
     .where(eq(userSettings.userId, userId));
   return row?.netSalaryCents ?? null;
 }
+
+/** Default payment method for quick-log prefill, or null if unset. Cheap
+ *  single-column read — mirrors getNetSalaryCents above. */
+export async function getDefaultPaymentMethodId(userId: string): Promise<string | null> {
+  const [row] = await getDb()
+    .select({ defaultPaymentMethodId: userSettings.defaultPaymentMethodId })
+    .from(userSettings)
+    .where(eq(userSettings.userId, userId));
+  return row?.defaultPaymentMethodId ?? null;
+}
 export type PaymentMethodRow = typeof paymentMethods.$inferSelect;
 export type AccountRow = typeof accounts.$inferSelect;
 export type SinkingFundRow = typeof sinkingFunds.$inferSelect;

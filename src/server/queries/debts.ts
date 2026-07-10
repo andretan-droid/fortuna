@@ -28,6 +28,7 @@ export async function fetchBnplInputs(
         firstDueMonth: bnplPlans.firstDueMonth,
         status: bnplPlans.status,
         categoryId: bnplPlans.categoryId,
+        paymentMethodId: bnplPlans.paymentMethodId,
         notes: bnplPlans.notes,
       })
       .from(bnplPlans)

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTransactionsFeed } from "@/hooks/use-transactions";
 import { formatDayHeader } from "@/lib/dates";
-import type { FeedFilters, FeedPage, FeedRow } from "@/server/queries/transactions";
+import type { FeedFilters, FeedPage, FeedRow, RecentDescription } from "@/server/queries/transactions";
 import { FeedFilters as Filters } from "./feed-filters";
 import { FeedRowItem } from "./feed-row";
 import { QuickLog } from "./quick-log";
@@ -19,12 +19,16 @@ export function TransactionsView({
   categories,
   paymentMethods,
   bnplPlans,
+  defaultPaymentMethodId,
+  recentDescriptions,
 }: {
   filters: FeedFilters;
   initialPage: FeedPage;
   categories: CategoryOption[];
   paymentMethods: SimpleOption[];
   bnplPlans: BnplOption[];
+  defaultPaymentMethodId?: string | null;
+  recentDescriptions?: RecentDescription[];
 }) {
   const feed = useTransactionsFeed(filters, initialPage);
   const [editing, setEditing] = useState<FeedRow | null>(null);
@@ -116,6 +120,8 @@ export function TransactionsView({
         categories={categories}
         paymentMethods={paymentMethods}
         bnplPlans={bnplPlans}
+        defaultPaymentMethodId={defaultPaymentMethodId}
+        recentDescriptions={recentDescriptions}
       />
       <TxnEditor
         row={editing}

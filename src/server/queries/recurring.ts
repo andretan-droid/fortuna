@@ -3,109 +3,122 @@ import { and, eq, gte, lt } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { categories, recurringRules, transactions } from "@/db/schema";
 import { monthBounds, monthKey, todayISO } from "@/lib/dates";
+import {
+  ruleApplies,
+  nextApplicableMonth,
+  matchStatus,
+  daysIn,
+  toRow,
+  type RuleInput,
+  type MonthTxn,
+  type RecurringStatusRow,
+  type UpcomingRow,
+} from "@/lib/recurring";
 
-/* Recurring-rule status. A rule is a known monthly bill; this checks it against
- * the current month's ledger and reports whether it has landed yet. Previously
- * NOTHING consumed recurring_rules — the settings copy claiming "the dashboard
- * flags missed" was aspirational. This query makes it true. */
+export type { RecurringStatus, AmountKind, RecurringStatusRow, UpcomingRow } from "@/lib/recurring";
 
-export type RecurringStatus = "paid" | "due" | "missed";
+/* Recurring-rule status. A rule is a known monthly/quarterly/yearly bill; this
+ * checks it against the ledger and reports whether it has landed yet.
+ * Cadence + matching math lives in lib/recurring.ts (DB-free, self-checked by
+ * scripts/verify-recurring.ts) — this file only fetches rows and calls it. */
 
-export type RecurringStatusRow = {
-  id: string;
-  description: string;
-  category: string;
-  expectedCents: number | null;
-  day: number | null;
-  status: RecurringStatus;
-  matchedAmountCents: number | null;
-};
+async function loadActiveRules(userId: string): Promise<RuleInput[]> {
+  return getDb()
+    .select({
+      id: recurringRules.id,
+      description: recurringRules.description,
+      categoryId: recurringRules.categoryId,
+      category: categories.name,
+      txnType: categories.type,
+      expectedCents: recurringRules.expectedCents,
+      paymentMethodId: recurringRules.paymentMethodId,
+      day: recurringRules.day,
+      tolerance: recurringRules.tolerance,
+      amountKind: recurringRules.amountKind,
+      intervalMonths: recurringRules.intervalMonths,
+      startMonth: recurringRules.startMonth,
+      endMonth: recurringRules.endMonth,
+      notes: recurringRules.notes,
+    })
+    .from(recurringRules)
+    .innerJoin(categories, eq(recurringRules.categoryId, categories.id))
+    .where(and(eq(recurringRules.userId, userId), eq(recurringRules.active, true)));
+}
 
-const DEFAULT_TOLERANCE = 0.05;
+async function loadMonthTxns(userId: string, month: string): Promise<MonthTxn[]> {
+  const { first, nextFirst } = monthBounds(month);
+  return getDb()
+    .select({
+      categoryId: transactions.categoryId,
+      paymentMethodId: transactions.paymentMethodId,
+      amountCents: transactions.amountCents,
+    })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.userId, userId),
+        eq(transactions.deleted, false),
+        gte(transactions.date, first),
+        lt(transactions.date, nextFirst),
+      ),
+    );
+}
 
-/** Each active rule's status for `month` ('YYYY-MM', defaults to current). A
- *  rule is "paid" once a live txn this month matches its category (+ payment
- *  method if set) and, when an expected amount is set, lands within tolerance.
- *  Unmatched rules are "missed" if their due day has passed, else "due". */
+/** Each rule APPLICABLE TO `month` ('YYYY-MM', defaults to current) and its
+ *  status. A rule whose cadence doesn't land in `month` (e.g. a quarterly bill
+ *  outside its quarter) is simply absent — no stale chip for a bill that isn't
+ *  due yet. */
 export async function getRecurringStatus(
   userId: string,
   month: string = monthKey(todayISO()),
 ): Promise<RecurringStatusRow[]> {
-  const db = getDb();
-  const { first, nextFirst } = monthBounds(month);
-
-  const [rules, txns] = await Promise.all([
-    db
-      .select({
-        id: recurringRules.id,
-        description: recurringRules.description,
-        categoryId: recurringRules.categoryId,
-        category: categories.name,
-        expectedCents: recurringRules.expectedCents,
-        paymentMethodId: recurringRules.paymentMethodId,
-        day: recurringRules.day,
-        tolerance: recurringRules.tolerance,
-      })
-      .from(recurringRules)
-      .innerJoin(categories, eq(recurringRules.categoryId, categories.id))
-      .where(and(eq(recurringRules.userId, userId), eq(recurringRules.active, true))),
-    db
-      .select({
-        categoryId: transactions.categoryId,
-        paymentMethodId: transactions.paymentMethodId,
-        amountCents: transactions.amountCents,
-      })
-      .from(transactions)
-      .where(
-        and(
-          eq(transactions.userId, userId),
-          eq(transactions.deleted, false),
-          gte(transactions.date, first),
-          lt(transactions.date, nextFirst),
-        ),
-      ),
-  ]);
-
-  // Today's day-of-month, but only meaningful when `month` IS the current month;
-  // for a past month everything unmatched is "missed", for a future one "due".
+  const [rules, txns] = await Promise.all([loadActiveRules(userId), loadMonthTxns(userId, month)]);
   const todayMonth = monthKey(todayISO());
   const todayDay = Number(todayISO().slice(8, 10));
+  const daysInMonth = daysIn(month);
+  const consumed = new Set<number>();
 
-  // Days in `month`, so a rule's day 29-31 still fires in shorter months.
-  const [yy, mm] = month.split("-").map(Number);
-  const daysInMonth = new Date(yy, mm, 0).getDate();
-
-  const consumed = new Set<number>(); // one txn satisfies at most one rule
-  return rules.map((r) => {
-    const tol = r.tolerance != null ? Number(r.tolerance) : DEFAULT_TOLERANCE;
-    const matchIdx = txns.findIndex((t, i) => {
-      if (consumed.has(i)) return false;
-      if (t.categoryId !== r.categoryId) return false;
-      if (r.paymentMethodId && t.paymentMethodId !== r.paymentMethodId) return false;
-      if (r.expectedCents != null) {
-        const slack = Math.max(1, Math.round(r.expectedCents * tol));
-        if (Math.abs(t.amountCents - r.expectedCents) > slack) return false;
-      }
-      return true;
+  return rules
+    .filter((r) => ruleApplies(r, month))
+    .map((r) => {
+      const { status, matchedAmountCents } = matchStatus(
+        r,
+        txns,
+        consumed,
+        month,
+        todayMonth,
+        todayDay,
+        daysInMonth,
+      );
+      return { ...toRow(r), status, matchedAmountCents };
     });
-    const match = matchIdx >= 0 ? txns[matchIdx] : undefined;
-    if (matchIdx >= 0) consumed.add(matchIdx);
+}
 
-    let status: RecurringStatus;
-    if (match) status = "paid";
-    else if (month < todayMonth) status = "missed";
-    else if (month > todayMonth) status = "due";
-    else if (r.day != null && Math.min(r.day, daysInMonth) < todayDay) status = "missed";
-    else status = "due";
+/** Every active rule, once: this month's paid/due/missed status if its
+ *  cadence applies now, otherwise its next future occurrence tagged
+ *  "upcoming" — so a quarterly StashAway top-up shows up as a preview before
+ *  it's actually due, not just silently absent for two months out of three. */
+export async function getUpcomingRecurring(userId: string): Promise<UpcomingRow[]> {
+  const month = monthKey(todayISO());
+  const [rules, txns] = await Promise.all([loadActiveRules(userId), loadMonthTxns(userId, month)]);
+  const todayDay = Number(todayISO().slice(8, 10));
+  const daysInMonth = daysIn(month);
+  const consumed = new Set<number>();
 
-    return {
-      id: r.id,
-      description: r.description,
-      category: r.category,
-      expectedCents: r.expectedCents,
-      day: r.day,
-      status,
-      matchedAmountCents: match?.amountCents ?? null,
-    };
+  return rules.map((r) => {
+    if (!ruleApplies(r, month)) {
+      const next = nextApplicableMonth(r, month);
+      return { ...toRow(r), month: next ?? month, status: "upcoming" as const, matchedAmountCents: null };
+    }
+    const { status, matchedAmountCents } = matchStatus(
+      r,
+      txns,
+      consumed,
+      month,
+      month,
+      todayDay,
+      daysInMonth,
+    );
+    return { ...toRow(r), month, status, matchedAmountCents };
   });
 }

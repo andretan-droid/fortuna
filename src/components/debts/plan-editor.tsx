@@ -12,9 +12,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { toCents, formatAmount } from "@/lib/money";
+import { toCents, formatAmount, formatCents } from "@/lib/money";
+import { todayISO, formatMonthLong } from "@/lib/dates";
+import { providerColor } from "@/lib/colors";
+import { Chip } from "@/components/ui/chip";
 import { createBnplPlan, updateBnplPlan, deleteBnplPlan } from "@/server/actions/debts";
-import type { BnplPlanState } from "@/lib/bnpl";
+import { instalmentAtCents, dueInYearCents, type BnplPlanState, type BnplPlanInput } from "@/lib/bnpl";
 
 type Opt = { id: string; name: string };
 
@@ -24,11 +27,15 @@ type Opt = { id: string; name: string };
 export function PlanEditor({
   plan,
   categories,
+  paymentMethods,
   onClose,
+  onPay,
 }: {
   plan: BnplPlanState | "new" | null;
   categories: Opt[];
+  paymentMethods: Opt[];
   onClose: () => void;
+  onPay?: (p: BnplPlanState) => void;
 }) {
   const editing = plan !== null && plan !== "new" ? plan : null;
   const [pending, startTransition] = useTransition();
@@ -46,7 +53,33 @@ export function PlanEditor({
   const [firstDueMonth, setFirstDueMonth] = useState(
     (editing?.firstDueMonth ?? "").slice(0, 7),
   );
+  const [paymentMethodId, setPaymentMethodId] = useState(editing?.paymentMethodId ?? "");
   const [notes, setNotes] = useState(editing?.notes ?? "");
+
+  // Live "N × RM.." preview from the form fields — works for new plans (no
+  // BnplPlanState yet) and re-derives as the user retypes total/instalments.
+  const totalPreviewCents = toCents(total) ?? 0;
+  const nPreview = Number(n) || 1;
+  const instalPreviewCents = instalment.trim() !== "" ? (toCents(instalment) ?? 0) : 0;
+  const previewPlan: BnplPlanInput = {
+    id: "preview",
+    item: "",
+    platform: null,
+    totalAmountCents: totalPreviewCents,
+    nInstalments: nPreview,
+    instalmentCents: instalPreviewCents,
+    firstDueMonth: null,
+    status: "",
+  };
+  const firstInstal = instalmentAtCents(previewPlan, 1);
+  const lastInstal = instalmentAtCents(previewPlan, nPreview);
+  const schedulePreview =
+    nPreview <= 1
+      ? formatCents(totalPreviewCents)
+      : firstInstal === lastInstal
+        ? `${nPreview} × ${formatCents(firstInstal)}`
+        : `${nPreview - 1} × ${formatCents(firstInstal)} + ${formatCents(lastInstal)}`;
+  const yearTotal = editing ? dueInYearCents(editing, todayISO().slice(0, 4)) : 0;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -71,6 +104,7 @@ export function PlanEditor({
       nInstalments: nN,
       instalmentCents: instalC,
       firstDueMonth: firstDueMonth || null,
+      paymentMethodId: paymentMethodId || null,
       notes: notes.trim() || null,
     };
     startTransition(async () => {
@@ -99,8 +133,9 @@ export function PlanEditor({
     <Dialog open={plan !== null} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-display text-2xl">
+          <DialogTitle className="flex items-center gap-2 font-display text-2xl">
             {editing ? "Edit plan" : "New BNPL plan"}
+            {editing?.platform && <Chip label={editing.platform} tone={providerColor(editing.platform)} />}
           </DialogTitle>
           <DialogDescription>
             Buy-Now-Pay-Later terms. Payments are tracked automatically from linked
@@ -182,15 +217,54 @@ export function PlanEditor({
               />
             </div>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="bp-firstdue">First due month</Label>
-            {/* ponytail: native month input over a picker lib — value is YYYY-MM */}
-            <Input
-              id="bp-firstdue"
-              type="month"
-              value={firstDueMonth}
-              onChange={(e) => setFirstDueMonth(e.target.value)}
-            />
+          <p className="text-xs text-muted-foreground">
+            Schedule: {schedulePreview}
+            {editing && editing.nextDue && (
+              <>
+                {" · "}
+                <span
+                  className={
+                    editing.nextDue < todayISO().slice(0, 7) ? "font-medium text-destructive" : ""
+                  }
+                >
+                  Next due {formatMonthLong(editing.nextDue)}
+                </span>
+              </>
+            )}
+            {editing && yearTotal > 0 && (
+              <>
+                {" · "}
+                {formatCents(yearTotal)} payable this year
+              </>
+            )}
+          </p>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="bp-firstdue">First due month</Label>
+              {/* ponytail: native month input over a picker lib — value is YYYY-MM */}
+              <Input
+                id="bp-firstdue"
+                type="month"
+                value={firstDueMonth}
+                onChange={(e) => setFirstDueMonth(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="bp-method">Payment method</Label>
+              <select
+                id="bp-method"
+                value={paymentMethodId}
+                onChange={(e) => setPaymentMethodId(e.target.value)}
+                className="border-input bg-transparent h-9 w-full rounded-md border px-3 text-sm shadow-xs outline-none"
+              >
+                <option value="">Default</option>
+                {paymentMethods.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="bp-notes">Notes</Label>
@@ -202,6 +276,19 @@ export function PlanEditor({
               placeholder="Optional"
             />
           </div>
+          {editing && !editing.done && onPay && (
+            <Button
+              type="button"
+              size="lg"
+              variant="outline"
+              onClick={() => {
+                onPay(editing);
+                onClose();
+              }}
+            >
+              Record payment
+            </Button>
+          )}
           <div className="flex items-center gap-2">
             <Button type="submit" size="lg" disabled={pending} className="flex-1">
               {pending ? "Saving…" : editing ? "Save changes" : "Add plan"}

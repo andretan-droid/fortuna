@@ -5,9 +5,11 @@ import {
   getBnplPlanOptions,
   getCategoryOptions,
   getPaymentMethodOptions,
+  getRecentDescriptions,
   getTransactionsPage,
   type FeedFilters,
 } from "@/server/queries/transactions";
+import { getDefaultPaymentMethodId } from "@/server/queries/settings";
 
 const TYPES = ["Income", "Expense", "Deduction", "Transfer"] as const;
 
@@ -34,12 +36,15 @@ export default async function TransactionsPage({
     showDeleted: one(sp.showDeleted) === "1",
   };
 
-  const [initialPage, categories, paymentMethods, bnplPlans] = await Promise.all([
-    getTransactionsPage(userId, filters),
-    getCategoryOptions(userId),
-    getPaymentMethodOptions(userId),
-    getBnplPlanOptions(userId),
-  ]);
+  const [initialPage, categories, paymentMethods, bnplPlans, defaultPaymentMethodId, recentDescriptions] =
+    await Promise.all([
+      getTransactionsPage(userId, filters),
+      getCategoryOptions(userId),
+      getPaymentMethodOptions(userId),
+      getBnplPlanOptions(userId),
+      getDefaultPaymentMethodId(userId),
+      getRecentDescriptions(userId),
+    ]);
 
   // MRU ordering for the quick-log combobox: categories seen in page 0
   // (already recency-ordered) float to the top; the rest stay alphabetical.
@@ -64,6 +69,8 @@ export default async function TransactionsPage({
         categories={mruCategories}
         paymentMethods={paymentMethods}
         bnplPlans={bnplPlans}
+        defaultPaymentMethodId={defaultPaymentMethodId}
+        recentDescriptions={recentDescriptions}
       />
     </div>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -33,6 +34,24 @@ export function TxnEditor({
   const update = useUpdateTransaction();
   const setDeleted = useSetTransactionDeleted();
 
+  // getBnplPlanOptions excludes completed plans, so an old transaction linked
+  // to a now-finished plan needs its plan synthesized back in — otherwise the
+  // combobox would show it blank and re-saving would silently drop the link.
+  const effectiveBnplPlans = useMemo(() => {
+    if (!row?.bnplPlanId || !row.bnpl) return bnplPlans;
+    if (bnplPlans.some((p) => p.id === row.bnplPlanId)) return bnplPlans;
+    return [
+      ...bnplPlans,
+      {
+        id: row.bnplPlanId,
+        item: row.bnpl.item,
+        platform: null,
+        nInstalments: row.bnpl.nInstalments,
+        instalmentCents: row.bnpl.instalmentCents,
+      },
+    ];
+  }, [bnplPlans, row]);
+
   return (
     <Dialog open={!!row} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-md">
@@ -50,7 +69,7 @@ export function TxnEditor({
               key={row.id} // remount per row → clean field state
               categories={categories}
               paymentMethods={paymentMethods}
-              bnplPlans={bnplPlans}
+              bnplPlans={effectiveBnplPlans}
               initial={{
                 date: row.date,
                 amountCents: row.amountCents,

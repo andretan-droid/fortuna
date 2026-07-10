@@ -3,7 +3,12 @@ import { Reveal } from "@/components/motion/reveal";
 import { requireUserId } from "@/server/auth-helpers";
 import { getDashboardSummary } from "@/server/queries/dashboard";
 import { getWealthSummary } from "@/server/queries/wealth";
-import { getRecurringStatus } from "@/server/queries/recurring";
+import { getUpcomingRecurring } from "@/server/queries/recurring";
+import {
+  getBnplPlanOptions,
+  getCategoryOptions,
+  getPaymentMethodOptions,
+} from "@/server/queries/transactions";
 import { HeroNumbers } from "@/components/dashboard/hero-numbers";
 import { MonthPulse } from "@/components/dashboard/month-pulse";
 import { BudgetFrameworks } from "@/components/dashboard/budget-frameworks";
@@ -17,10 +22,13 @@ import { EmptyState } from "@/components/dashboard/empty-state";
 
 export default async function DashboardPage() {
   const userId = await requireUserId();
-  const [summary, wealth, recurring] = await Promise.all([
+  const [summary, wealth, recurring, categories, paymentMethods, bnplPlans] = await Promise.all([
     getDashboardSummary(userId),
     getWealthSummary(userId),
-    getRecurringStatus(userId),
+    getUpcomingRecurring(userId),
+    getCategoryOptions(userId),
+    getPaymentMethodOptions(userId),
+    getBnplPlanOptions(userId),
   ]);
 
   const [y, m] = summary.month.split("-").map(Number);
@@ -59,7 +67,12 @@ export default async function DashboardPage() {
 
           {recurring.length > 0 && (
             <Reveal index={2}>
-              <UpcomingBills rows={recurring} />
+              <UpcomingBills
+                rows={recurring}
+                categories={categories}
+                paymentMethods={paymentMethods}
+                bnplPlans={bnplPlans}
+              />
             </Reveal>
           )}
 

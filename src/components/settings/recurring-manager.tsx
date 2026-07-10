@@ -15,12 +15,18 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { formatCents, toCents, formatAmount } from "@/lib/money";
+import { AMOUNT_KINDS } from "@/db/schema";
 import { deleteRecurringRule, saveRecurringRule } from "@/server/actions/settings";
 import type { RecurringRuleRow } from "@/server/queries/settings";
 import type { RecurringStatusRow } from "@/server/queries/recurring";
 import { SettingsSection } from "./section";
 
 type Opt = { id: string; name: string };
+const CADENCES = [
+  { value: "1", label: "Monthly" },
+  { value: "3", label: "Quarterly" },
+  { value: "12", label: "Yearly" },
+] as const;
 
 const STATUS_CHIP: Record<RecurringStatusRow["status"], { label: string; className: string }> = {
   paid: { label: "Paid", className: "bg-income/15 text-income" },
@@ -51,6 +57,11 @@ function RuleEditor({
   const [day, setDay] = useState(editing?.day != null ? String(editing.day) : "");
   // legacy tolerance values: 0.01 (strict) / 0.05 (loose)
   const [tolerance, setTolerance] = useState(editing?.tolerance ?? "0.05");
+  const [amountKind, setAmountKind] = useState(editing?.amountKind ?? "fixed");
+  const [cadence, setCadence] = useState(String(editing?.intervalMonths ?? 1));
+  const [startMonth, setStartMonth] = useState((editing?.startMonth ?? "").slice(0, 7));
+  const [endMonth, setEndMonth] = useState((editing?.endMonth ?? "").slice(0, 7));
+  const [notes, setNotes] = useState(editing?.notes ?? "");
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -77,6 +88,11 @@ function RuleEditor({
         day: dayN,
         tolerance: tolerance ? Number(tolerance) : null,
         active: editing?.active ?? true,
+        amountKind,
+        intervalMonths: Number(cadence),
+        startMonth: startMonth || null,
+        endMonth: endMonth || null,
+        notes: notes.trim() || null,
       });
       if (res.ok) {
         toast.success(editing ? "Saved" : "Rule created");
@@ -158,6 +174,69 @@ function RuleEditor({
                 <option value="0.05">±5%</option>
               </select>
             </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="rr-kind">Amount</Label>
+              <select
+                id="rr-kind"
+                value={amountKind}
+                onChange={(e) => setAmountKind(e.target.value as (typeof AMOUNT_KINDS)[number])}
+                className="border-input bg-transparent h-9 w-full rounded-md border px-3 text-sm shadow-xs outline-none"
+              >
+                {AMOUNT_KINDS.map((k) => (
+                  <option key={k} value={k}>
+                    {k === "fixed" ? "Fixed" : k === "estimated" ? "Estimated" : "Variable"}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="rr-cadence">Cadence</Label>
+              <select
+                id="rr-cadence"
+                value={cadence}
+                onChange={(e) => setCadence(e.target.value)}
+                className="border-input bg-transparent h-9 w-full rounded-md border px-3 text-sm shadow-xs outline-none"
+              >
+                {CADENCES.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="rr-start">Start month</Label>
+              {/* ponytail: native month input over a picker lib — value is YYYY-MM */}
+              <Input
+                id="rr-start"
+                type="month"
+                value={startMonth}
+                onChange={(e) => setStartMonth(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="rr-end">End month</Label>
+              <Input
+                id="rr-end"
+                type="month"
+                value={endMonth}
+                onChange={(e) => setEndMonth(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="rr-notes">Notes</Label>
+            <Input
+              id="rr-notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              autoComplete="off"
+              placeholder="Optional"
+            />
           </div>
           <Button type="submit" size="lg" disabled={pending}>
             {pending ? "Saving…" : editing ? "Save changes" : "Create rule"}

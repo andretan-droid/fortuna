@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { toCents, formatAmount } from "@/lib/money";
 import { todayISO } from "@/lib/dates";
 import type { TxnInput } from "@/server/actions/transactions";
+import type { RecentDescription } from "@/server/queries/transactions";
 
 export type CategoryOption = {
   id: string;
@@ -33,6 +34,9 @@ export type BnplOption = {
   platform: string | null;
   nInstalments: number;
   instalmentCents: number;
+  categoryId?: string | null;
+  paymentMethodId?: string | null;
+  nextInstalmentCents?: number;
 };
 
 /* Generic searchable combobox: Popover + Command (the plan's pattern; no new
@@ -143,6 +147,7 @@ export function TxnForm({
   categories,
   paymentMethods,
   bnplPlans,
+  recentDescriptions = [],
   initial,
   submitLabel,
   pending,
@@ -151,6 +156,7 @@ export function TxnForm({
   categories: CategoryOption[];
   paymentMethods: SimpleOption[];
   bnplPlans: BnplOption[];
+  recentDescriptions?: RecentDescription[];
   initial?: Partial<TxnInput>;
   submitLabel: string;
   pending: boolean;
@@ -172,6 +178,28 @@ export function TxnForm({
     () => categories.find((c) => c.id === categoryId),
     [categories, categoryId],
   );
+
+  // Picking a recent merchant prefills category/method — but only into EMPTY
+  // fields, so it never clobbers something already chosen.
+  function handleDescriptionChange(value: string) {
+    setDescription(value);
+    const match = recentDescriptions.find((d) => d.description === value);
+    if (!match) return;
+    if (!categoryId) setCategoryId(match.categoryId);
+    if (!paymentMethodId && match.paymentMethodId) setPaymentMethodId(match.paymentMethodId);
+  }
+
+  // Same "only fill empty fields" rule for picking a BNPL plan — amount comes
+  // from the plan's next instalment (final absorbs rounding), computed server-side.
+  function handleBnplChange(id: string | null) {
+    setBnplPlanId(id);
+    const plan = id ? bnplPlans.find((p) => p.id === id) : undefined;
+    if (!plan) return;
+    if (!amount.trim() && plan.nextInstalmentCents != null)
+      setAmount(formatAmount(plan.nextInstalmentCents));
+    if (!categoryId && plan.categoryId) setCategoryId(plan.categoryId);
+    if (!paymentMethodId && plan.paymentMethodId) setPaymentMethodId(plan.paymentMethodId);
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -265,27 +293,42 @@ export function TxnForm({
         <Input
           id="txn-desc"
           value={description}
-          onChange={(e) => setDescription(e.target.value)}
+          onChange={(e) => handleDescriptionChange(e.target.value)}
           placeholder="e.g. Nasi lemak, TNB bill…"
           autoComplete="off"
+          list={recentDescriptions.length ? "txn-desc-recent" : undefined}
         />
+        {recentDescriptions.length > 0 && (
+          <datalist id="txn-desc-recent">
+            {recentDescriptions.map((d) => (
+              <option key={d.description} value={d.description} />
+            ))}
+          </datalist>
+        )}
       </div>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="txn-bnpl">BNPL plan</Label>
-        <OptionCombobox
-          id="txn-bnpl"
-          value={bnplPlanId}
-          onChange={setBnplPlanId}
-          options={bnplPlans.map((p) => ({
-            value: p.id,
-            label: p.item,
-            hint: `${p.nInstalments}×`,
-          }))}
-          placeholder={bnplPlans.length ? "Optional — link an instalment" : "No plans yet"}
-          allowClear
-        />
-      </div>
+      {/* Collapsed unless a plan is already linked (editing) — fewer fields
+          upfront for the common non-BNPL transaction. */}
+      <details open={!!bnplPlanId} className="group">
+        <summary className="cursor-pointer list-none text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+          More {bnplPlanId ? "" : "(BNPL plan)"}
+        </summary>
+        <div className="mt-2 space-y-1.5">
+          <Label htmlFor="txn-bnpl">BNPL plan</Label>
+          <OptionCombobox
+            id="txn-bnpl"
+            value={bnplPlanId}
+            onChange={handleBnplChange}
+            options={bnplPlans.map((p) => ({
+              value: p.id,
+              label: p.item,
+              hint: `${p.nInstalments}×`,
+            }))}
+            placeholder={bnplPlans.length ? "Optional — link an instalment" : "No plans yet"}
+            allowClear
+          />
+        </div>
+      </details>
 
       {error && (
         <p id="txn-form-error" className="text-sm text-destructive">

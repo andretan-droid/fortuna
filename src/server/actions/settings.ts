@@ -6,6 +6,7 @@ import { z } from "zod";
 import { getDb } from "@/db/client";
 import {
   accounts,
+  AMOUNT_KINDS,
   bnplPlans,
   categories,
   fxRates,
@@ -319,6 +320,11 @@ export async function deleteSinkingFund(id: string): Promise<ActionResult> {
 
 /* ---------------------------------------------------------- recurring rules */
 
+const monthStr = z
+  .string()
+  .regex(/^\d{4}-\d{2}$/, "Use YYYY-MM")
+  .nullable();
+
 const recurringInput = z.object({
   description: z.string().trim().min(1, "Description is required").max(200),
   categoryId: uuid,
@@ -327,6 +333,11 @@ const recurringInput = z.object({
   day: z.number().int().min(1).max(31).nullable(),
   tolerance: z.number().min(0).max(1).nullable(), // fraction, e.g. 0.05
   active: z.boolean().default(true),
+  amountKind: z.enum(AMOUNT_KINDS).default("fixed"),
+  intervalMonths: z.number().int().min(1).default(1), // 1/3/12 = monthly/quarterly/yearly
+  startMonth: monthStr,
+  endMonth: monthStr,
+  notes: z.string().trim().max(500).nullable(),
 });
 
 export async function saveRecurringRule(id: string | null, raw: unknown): Promise<ActionResult> {

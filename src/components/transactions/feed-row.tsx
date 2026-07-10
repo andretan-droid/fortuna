@@ -1,6 +1,8 @@
 "use client";
 
 import { formatCents } from "@/lib/money";
+import { frameworkColor, kindColor } from "@/lib/colors";
+import { Chip } from "@/components/ui/chip";
 import { BnplBadge } from "./bnpl-badge";
 import type { FeedRow } from "@/server/queries/transactions";
 
@@ -29,10 +31,9 @@ export function FeedRowItem({
         <p className={`truncate text-sm ${row.deleted ? "line-through" : ""}`}>
           {row.description || row.category}
         </p>
-        <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
-          <span className="font-medium text-foreground/70">{row.category}</span>
+        <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+          <Chip label={row.category} tone={frameworkColor(row.framework)} />
           {row.mainCategory && <span>· {row.mainCategory}</span>}
-          <span>· {row.framework}</span>
           {row.type !== "Expense" && (
             <span
               className={`rounded-full border px-1.5 py-px text-[10px] leading-4 ${
@@ -53,9 +54,7 @@ export function FeedRowItem({
       <div className="flex shrink-0 items-center gap-2">
         {row.bnpl && <BnplBadge bnpl={row.bnpl} />}
         {row.paymentMethod && (
-          <span className="hidden rounded-full bg-secondary px-2 py-0.5 text-[11px] leading-4 text-secondary-foreground sm:inline-flex">
-            {row.paymentMethod}
-          </span>
+          <Chip label={row.paymentMethod} tone={kindColor(row.paymentMethodKind ?? "Other")} />
         )}
         <span
           className={`tabular text-sm font-medium ${

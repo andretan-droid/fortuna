@@ -4,7 +4,7 @@ import { requireUserId } from "@/server/auth-helpers";
 import { getDebtsSummary } from "@/server/queries/debts";
 import { getReceivablesSummary } from "@/server/queries/receivables";
 import { getWealthSummary } from "@/server/queries/wealth";
-import { getCategoryOptions } from "@/server/queries/transactions";
+import { getCategoryOptions, getPaymentMethodOptions } from "@/server/queries/transactions";
 import { BnplLadder, LiabilityAccounts } from "@/components/debts/bnpl-ladder";
 import { OwedToMe } from "@/components/debts/owed-to-me";
 import { formatCents } from "@/lib/money";
@@ -16,10 +16,11 @@ import { cn } from "@/lib/utils";
  *  wealth's account list (no extra query). */
 export default async function DebtsPage() {
   const userId = await requireUserId();
-  const [debts, wealth, categories, receivables] = await Promise.all([
+  const [debts, wealth, categories, paymentMethods, receivables] = await Promise.all([
     getDebtsSummary(userId),
     getWealthSummary(userId),
     getCategoryOptions(userId),
+    getPaymentMethodOptions(userId),
     getReceivablesSummary(userId),
   ]);
 
@@ -65,7 +66,7 @@ export default async function DebtsPage() {
       </Reveal>
 
       <Reveal index={1}>
-        <BnplLadder summary={debts} categories={categories} />
+        <BnplLadder summary={debts} categories={categories} paymentMethods={paymentMethods} />
       </Reveal>
 
       <Reveal index={2}>

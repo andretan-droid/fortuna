@@ -21,6 +21,7 @@ export type BnplPlanInput = {
   status: string;
   // Carried through to BnplPlanState for the editor UI; unused by the math.
   categoryId?: string;
+  paymentMethodId?: string | null;
   notes?: string | null;
 };
 
@@ -38,6 +39,7 @@ export type BnplPlanState = BnplPlanInput & {
   nextDue: string; // 'YYYY-MM' or '' when done
   payoff: string; // 'YYYY-MM' the final instalment lands
   paidThisMonth: boolean;
+  paidMonths: string[]; // linked-txn months, ascending — schedule/year-total input
   pct: number; // 0..1 progress
 };
 
@@ -52,11 +54,54 @@ export type BnplSummary = {
   latestPayoff: string;
 };
 
-function effN(p: BnplPlanInput): number {
+/** The 3 raw fields the rounding math needs — deliberately narrower than
+ *  BnplPlanInput so callers holding a partial plan projection (e.g. a
+ *  dropdown-option row) don't need to fabricate firstDueMonth/status/etc. */
+type PlanAmounts = Pick<BnplPlanInput, "totalAmountCents" | "nInstalments" | "instalmentCents">;
+
+function effN(p: PlanAmounts): number {
   return p.nInstalments > 0 ? p.nInstalments : 1;
 }
-function effInstal(p: BnplPlanInput, n: number): number {
+function effInstal(p: PlanAmounts, n: number): number {
   return p.instalmentCents > 0 ? p.instalmentCents : Math.round(p.totalAmountCents / n);
+}
+
+/** Instalment `i` (1-based) in cents. 1..n−1 = the flat instalment; the final
+ *  instalment absorbs whatever rounding remainder is left so the schedule
+ *  always sums to exactly `totalAmountCents` — no cent ever goes missing. */
+export function instalmentAtCents(p: PlanAmounts, i: number): number {
+  const n = effN(p);
+  const instal = effInstal(p, n);
+  if (i < n) return instal;
+  return Math.max(0, p.totalAmountCents - instal * (n - 1));
+}
+
+export type BnplScheduleRow = {
+  index: number; // 1-based instalment number
+  month: string; // 'YYYY-MM' — actual paid month, or projected
+  amountCents: number;
+  paid: boolean;
+};
+
+/** Full 1..n schedule for one plan. Paid rows (1..paidMonths.length) use the
+ *  actual linked-txn months; remaining rows project monthly from `nextDue`. */
+export function planSchedule(p: BnplPlanState): BnplScheduleRow[] {
+  const paidMonths = [...p.paidMonths].sort();
+  const rows: BnplScheduleRow[] = [];
+  for (let i = 1; i <= p.n; i++) {
+    const paid = i <= paidMonths.length;
+    const month = paid ? paidMonths[i - 1] : addMonths(p.nextDue, i - paidMonths.length - 1);
+    rows.push({ index: i, month, amountCents: instalmentAtCents(p, i), paid });
+  }
+  return rows;
+}
+
+/** Sum of this plan's scheduled instalments landing in calendar year `year`
+ *  ('YYYY') — paid + projected — for the "payable this year" figure. */
+export function dueInYearCents(p: BnplPlanState, year: string): number {
+  return planSchedule(p)
+    .filter((r) => r.month.slice(0, 4) === year)
+    .reduce((sum, r) => sum + r.amountCents, 0);
 }
 
 /** Full per-plan state + aggregates, as at month `ym` ('YYYY-MM'). */
@@ -82,7 +127,10 @@ export function bnplState(
     const months = byPlan.get(p.id) ?? [];
     const paid = Math.min(months.length, n);
     const left = Math.max(0, n - paid);
-    const outstanding = Math.max(0, total - paid * instal);
+    // left===0 (all n paid, incl. the rounding-absorbing final) must be
+    // EXACTLY 0 owed — paid×instal alone can leave a 1-2¢ residue since
+    // `instal` is the flat (non-final) amount, not the true per-instalment sum.
+    const outstanding = left === 0 ? 0 : Math.max(0, total - paid * instal);
     const lastPaid = months.length ? months[months.length - 1] : "";
     const firstDue = (p.firstDueMonth ?? "").slice(0, 7) || (months.length ? months[0] : "");
     const nextDue = left === 0 ? "" : lastPaid ? addMonths(lastPaid, 1) : firstDue || ym;
@@ -100,6 +148,7 @@ export function bnplState(
       nextDue,
       payoff,
       paidThisMonth,
+      paidMonths: months,
       pct: n ? paid / n : 0,
     };
   });
@@ -139,7 +188,7 @@ export function bnplOutstandingAtCents(
     const n = effN(p);
     const instal = effInstal(p, n);
     const paid = Math.min(paidUpTo.get(p.id) ?? 0, n);
-    sum += Math.max(0, p.totalAmountCents - paid * instal);
+    sum += paid >= n ? 0 : Math.max(0, p.totalAmountCents - paid * instal);
   }
   return sum;
 }

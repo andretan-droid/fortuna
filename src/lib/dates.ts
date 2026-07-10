@@ -57,4 +57,12 @@ export function addMonths(month: string, n: number): string {
   return `${ny}-${String(nm + 1).padStart(2, "0")}`;
 }
 
+/** Months between two 'YYYY-MM' strings (b − a; may be negative). Pure integer
+ *  math, mirrors addMonths — used for recurring-rule cadence checks. */
+export function monthDiff(a: string, b: string): number {
+  const [ay, am] = a.split("-").map(Number);
+  const [by, bm] = b.split("-").map(Number);
+  return by * 12 + (bm - 1) - (ay * 12 + (am - 1));
+}
+
 export const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;

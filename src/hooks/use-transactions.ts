@@ -100,6 +100,7 @@ export function useCreateTransaction(filters: FeedFilters, display: {
         framework: cat?.framework ?? "Wants",
         paymentMethodId: input.paymentMethodId ?? null,
         paymentMethod: display.paymentMethod(input.paymentMethodId),
+        paymentMethodKind: null, // real kind arrives with the settle refetch
         bnplPlanId: input.bnplPlanId ?? null,
         bnpl: null, // real badge arrives with the settle refetch
         deleted: false,

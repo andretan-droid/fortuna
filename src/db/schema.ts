@@ -67,6 +67,9 @@ export const PAYMENT_METHOD_KINDS = [
   "Other",
 ] as const;
 export const paymentMethodKind = pgEnum("payment_method_kind", PAYMENT_METHOD_KINDS);
+/** Recurring-rule amount kind — plain text (not pgEnum) so it stays a cheap
+ *  additive column; one source of truth for the zod validator and the UI. */
+export const AMOUNT_KINDS = ["fixed", "estimated", "variable"] as const;
 
 /* ============================================================================
    Auth.js tables (adapter-standard). Collision fix: the OAuth link table is
@@ -196,6 +199,10 @@ export const bnplPlans = pgTable(
     instalmentCents: bigint("instalment_cents", { mode: "number" }).notNull(),
     firstDueMonth: text("first_due_month"),
     status: text("status").notNull().default("auto"),
+    // Default payment method for instalments; overridable per record-payment.
+    paymentMethodId: uuid("payment_method_id").references(() => paymentMethods.id, {
+      onDelete: "restrict",
+    }),
     notes: text("notes"),
   },
   (t) => [
@@ -408,9 +415,20 @@ export const recurringRules = pgTable(
     ),
     day: integer("day"),
     tolerance: numeric("tolerance", { precision: 6, scale: 4 }),
+    // fixed = amount-tolerance matching (legacy behaviour); estimated/variable
+    // match on category+method only — the expected amount becomes a hint.
+    amountKind: text("amount_kind").notNull().default("fixed"),
+    // Cadence: 1=monthly, 3=quarterly, 12=yearly. null start = "always monthly".
+    intervalMonths: integer("interval_months").notNull().default(1),
+    startMonth: text("start_month"),
+    endMonth: text("end_month"),
+    notes: text("notes"),
     active: boolean("active").notNull().default(true),
   },
-  (t) => [check("recurring_day_range", sql`${t.day} between 1 and 31`)],
+  (t) => [
+    check("recurring_day_range", sql`${t.day} between 1 and 31`),
+    check("recurring_interval_min", sql`${t.intervalMonths} >= 1`),
+  ],
 );
 
 export const userSettings = pgTable(

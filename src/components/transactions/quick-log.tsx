@@ -13,7 +13,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useCreateTransaction } from "@/hooks/use-transactions";
-import type { FeedFilters } from "@/server/queries/transactions";
+import type { FeedFilters, RecentDescription } from "@/server/queries/transactions";
 import { TxnForm, type BnplOption, type CategoryOption, type SimpleOption } from "./txn-form";
 
 /** FAB + Sheet quick-log. Optimistic: the row lands in the feed the instant
@@ -23,11 +23,15 @@ export function QuickLog({
   categories,
   paymentMethods,
   bnplPlans,
+  defaultPaymentMethodId,
+  recentDescriptions,
 }: {
   filters: FeedFilters;
   categories: CategoryOption[];
   paymentMethods: SimpleOption[];
   bnplPlans: BnplOption[];
+  defaultPaymentMethodId?: string | null;
+  recentDescriptions?: RecentDescription[];
 }) {
   const [open, setOpen] = useState(false);
   const create = useCreateTransaction(filters, {
@@ -57,6 +61,8 @@ export function QuickLog({
             categories={categories}
             paymentMethods={paymentMethods}
             bnplPlans={bnplPlans}
+            recentDescriptions={recentDescriptions}
+            initial={{ paymentMethodId: defaultPaymentMethodId ?? undefined }}
             submitLabel="Log transaction"
             pending={create.isPending}
             onSubmit={(input) => {
