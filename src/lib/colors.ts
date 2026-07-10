@@ -27,10 +27,16 @@ function hashPick<T>(key: string, arr: readonly T[]): T {
   return arr[h % arr.length];
 }
 
+// Curated brand tones. Atome = lime-yellow, Shopee family = orange, Grab family
+// = green — the three use dedicated globals.css tokens (--atome/--shopee) or the
+// green --chart-2 so each platform card reads as its own color.
+const ATOME_TONE: Tone = { bg: "bg-atome/15", text: "text-atome" };
+const SHOPEE_TONE: Tone = { bg: "bg-shopee/15", text: "text-shopee" };
+
 const PROVIDER_TONES: Record<string, Tone> = {
-  atome: CHART_TONES[2], // amber
-  shopee: CHART_TONES[2], // orange-ish — shares the warm slot
-  spaylater: CHART_TONES[2],
+  atome: ATOME_TONE, // lime-yellow
+  shopee: SHOPEE_TONE, // orange
+  spaylater: SHOPEE_TONE, // Shopee SPayLater
   grab: CHART_TONES[1], // green
   gpaylater: CHART_TONES[1],
 };

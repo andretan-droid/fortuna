@@ -31,14 +31,25 @@ function planStatus(p: BnplPlanState, currentMonth: string): { label: string; to
   return { label: "Active", tone: ACTIVE_TONE };
 }
 
-/** One plan row — clickable to edit. Shows payoff progress and what's owed. */
+/** A Tone's `text-*` class → its CSS custom property, e.g. `text-chart-2` →
+ *  `var(--chart-2)`. Lets us drive an inline border/background color off the
+ *  same palette without a runtime-built Tailwind class (which the static
+ *  scanner would never generate). */
+function toneVar(tone: Tone): string {
+  return `var(--${tone.text.slice("text-".length)})`;
+}
+
+/** One plan row — clickable to edit. Shows payoff progress and what's owed.
+ *  `tone` colors the payoff bar to match the plan's platform card. */
 function PlanRow({
   p,
+  tone,
   currentMonth,
   onEdit,
   onPay,
 }: {
   p: BnplPlanState;
+  tone: Tone;
   currentMonth: string;
   onEdit: () => void;
   onPay: () => void;
@@ -65,7 +76,9 @@ function PlanRow({
           p.done && "opacity-60",
         )}
       >
-        <div className="flex items-baseline justify-between gap-4">
+        {/* Stacks on mobile (title block, then amount + Pay on their own row);
+            side-by-side from sm up. */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
           <div className="min-w-0">
             <p className="truncate text-sm font-medium underline-offset-4 group-hover:underline">
               {p.item}
@@ -78,8 +91,8 @@ function PlanRow({
               </span>
             </p>
           </div>
-          <div className="flex shrink-0 items-center gap-3">
-            <div className="text-right">
+          <div className="flex shrink-0 items-center justify-between gap-3 sm:justify-end">
+            <div className="text-left sm:text-right">
               <p className="tabular font-display text-lg leading-none">
                 {formatCents(p.outstanding)}
               </p>
@@ -107,8 +120,8 @@ function PlanRow({
         </div>
         <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
           <div
-            className={cn("h-full rounded-full", p.done ? "bg-income" : "bg-primary")}
-            style={{ width: `${pct}%` }}
+            className={cn("h-full rounded-full", p.done && "bg-income")}
+            style={{ width: `${pct}%`, ...(p.done ? {} : { backgroundColor: toneVar(tone) }) }}
           />
         </div>
       </div>
@@ -116,16 +129,17 @@ function PlanRow({
   );
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="mt-5 mb-1 flex items-baseline justify-between text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground first:mt-0">
-      {children}
-    </p>
-  );
-}
+type PlatformGroup = {
+  platform: string;
+  plans: BnplPlanState[];
+  commit: number; // Σ monthly instalment
+  dueCount: number; // plans not yet paid this month
+};
 
-/** BNPL plans in three tiers: due this month, active (grouped by platform), and
- *  a collapsed "paid off" section. Rows open the plan editor. */
+/** BNPL plans grouped into one colored card per platform. Within a card, plans
+ *  due this month sort to the top; cards with anything due sort to the top of
+ *  the stack. A collapsed "paid off" section (pooled across platforms) sits
+ *  below. Rows open the plan editor. */
 export function BnplLadder({
   summary,
   categories,
@@ -138,35 +152,35 @@ export function BnplLadder({
   const [editing, setEditing] = useState<BnplPlanState | "new" | null>(null);
   const [paying, setPaying] = useState<BnplPlanState | null>(null);
 
-  const { due, ongoingByPlatform, done, doneTotal } = useMemo(() => {
-    const active = summary.active;
-    const due = active
-      .filter((p) => !p.paidThisMonth)
-      .sort((a, b) => a.payoff.localeCompare(b.payoff));
-    const ongoing = active
-      .filter((p) => p.paidThisMonth)
-      .sort((a, b) => a.payoff.localeCompare(b.payoff));
-
+  const { groups, done, doneTotal } = useMemo(() => {
     const byPlatform = new Map<string, BnplPlanState[]>();
-    for (const p of ongoing) {
+    for (const p of summary.active) {
       const key = p.platform ?? "Other";
       const list = byPlatform.get(key) ?? [];
       list.push(p);
       byPlatform.set(key, list);
     }
-    const ongoingByPlatform = [...byPlatform.entries()]
-      .map(([platform, plans]) => ({
-        platform,
-        plans,
-        commit: plans.reduce((s, p) => s + p.instal, 0),
-      }))
-      .sort((a, b) => a.platform.localeCompare(b.platform));
+    const groups: PlatformGroup[] = [...byPlatform.entries()].map(([platform, plans]) => ({
+      platform,
+      // Due (not paid this month) first, then by payoff date.
+      plans: [...plans].sort((a, b) => {
+        if (a.paidThisMonth !== b.paidThisMonth) return a.paidThisMonth ? 1 : -1;
+        return a.payoff.localeCompare(b.payoff);
+      }),
+      commit: plans.reduce((s, p) => s + p.instal, 0),
+      dueCount: plans.filter((p) => !p.paidThisMonth).length,
+    }));
+    // Cards with something due bubble to the top, then alphabetical.
+    groups.sort((a, b) => {
+      if ((a.dueCount > 0) !== (b.dueCount > 0)) return a.dueCount > 0 ? -1 : 1;
+      return a.platform.localeCompare(b.platform);
+    });
 
     const done = summary.plans
       .filter((p) => p.done)
       .sort((a, b) => b.payoff.localeCompare(a.payoff));
     const doneTotal = done.reduce((s, p) => s + p.totalAmountCents, 0);
-    return { due, ongoingByPlatform, done, doneTotal };
+    return { groups, done, doneTotal };
   }, [summary]);
 
   const addButton = (
@@ -174,8 +188,6 @@ export function BnplLadder({
       <Plus className="size-4" /> Add plan
     </Button>
   );
-
-  const hasActive = due.length > 0 || ongoingByPlatform.length > 0;
 
   return (
     <Panel title="BNPL plans" headerRight={addButton}>
@@ -185,61 +197,52 @@ export function BnplLadder({
           you still owe.
         </p>
       ) : (
-        <>
-          {due.length > 0 && (
-            <div className="rounded-lg border-l-2 border-l-primary bg-primary/5 pl-3 pr-3">
-              <SectionLabel>
-                <span>Due this month</span>
-                <span className="tabular normal-case tracking-normal">
-                  {formatCents(due.reduce((s, p) => s + p.instal, 0))}
-                </span>
-              </SectionLabel>
-              <ul className="divide-y divide-border">
-                {due.map((p) => (
-                  <PlanRow
-                    key={p.id}
-                    p={p}
-                    currentMonth={summary.currentMonth}
-                    onEdit={() => setEditing(p)}
-                    onPay={() => setPaying(p)}
-                  />
-                ))}
-              </ul>
-            </div>
-          )}
+        <div className="space-y-4">
+          {groups.map((g) => {
+            const tone = providerColor(g.platform);
+            return (
+              <div
+                key={g.platform}
+                className={cn("rounded-xl border border-border/60 border-l-4 px-3 py-4 sm:px-5", tone.bg)}
+                style={{ borderLeftColor: toneVar(tone) }}
+              >
+                <div className="mb-1 flex items-baseline justify-between gap-2">
+                  <span className="flex items-baseline gap-2">
+                    <span className={cn("text-xs font-semibold uppercase tracking-[0.14em]", tone.text)}>
+                      {g.platform}
+                    </span>
+                    {g.dueCount > 0 && (
+                      <span className="text-xs font-medium text-warning">· {g.dueCount} due</span>
+                    )}
+                  </span>
+                  <span className="tabular text-xs text-muted-foreground">
+                    {formatCents(g.commit)}/mo
+                  </span>
+                </div>
+                <ul className="divide-y divide-border/60">
+                  {g.plans.map((p) => (
+                    <PlanRow
+                      key={p.id}
+                      p={p}
+                      tone={tone}
+                      currentMonth={summary.currentMonth}
+                      onEdit={() => setEditing(p)}
+                      onPay={() => setPaying(p)}
+                    />
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
 
-          {ongoingByPlatform.map((g) => (
-            <div key={g.platform}>
-              <SectionLabel>
-                <span className="flex items-center gap-1.5">
-                  <Chip label={g.platform} tone={providerColor(g.platform)} />
-                </span>
-                <span className="tabular normal-case tracking-normal">
-                  {formatCents(g.commit)}/mo
-                </span>
-              </SectionLabel>
-              <ul className="divide-y divide-border">
-                {g.plans.map((p) => (
-                  <PlanRow
-                    key={p.id}
-                    p={p}
-                    currentMonth={summary.currentMonth}
-                    onEdit={() => setEditing(p)}
-                    onPay={() => setPaying(p)}
-                  />
-                ))}
-              </ul>
-            </div>
-          ))}
-
-          {!hasActive && done.length > 0 && (
+          {!groups.length && done.length > 0 && (
             <p className="py-4 text-center text-sm text-muted-foreground">
               All plans paid off. 🎉
             </p>
           )}
 
           {done.length > 0 && (
-            <details className="group mt-5 border-t pt-3">
+            <details className="group border-t pt-3">
               <summary className="flex cursor-pointer list-none items-center justify-between text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <ChevronRight className="size-3.5 transition-transform group-open:rotate-90" />
@@ -254,6 +257,7 @@ export function BnplLadder({
                   <PlanRow
                     key={p.id}
                     p={p}
+                    tone={providerColor(p.platform)}
                     currentMonth={summary.currentMonth}
                     onEdit={() => setEditing(p)}
                     onPay={() => setPaying(p)}
@@ -262,7 +266,7 @@ export function BnplLadder({
               </ul>
             </details>
           )}
-        </>
+        </div>
       )}
 
       <PlanEditor
